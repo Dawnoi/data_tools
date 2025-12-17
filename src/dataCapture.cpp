@@ -17,6 +17,7 @@
 #include <fstream>
 #include <sensor_msgs/msg/imu.hpp>
 #include <data_msgs/msg/gripper.hpp>
+#include <data_msgs/msg/instruction.hpp>
 #include <data_msgs/msg/capture_status.hpp>
 #include "data_msgs/srv/capture_service.hpp"
 #include <pcl/filters/passthrough.h>
@@ -39,6 +40,7 @@ public:
     std::vector<rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr> subImu9Axiss;
     std::vector<rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr> subLidarPointClouds;
     std::vector<rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr> subRobotBaseVels;
+    std::vector<rclcpp::Subscription<data_msgs::msg::Instruction>::SharedPtr> subInstructionTexts;
     #ifdef _USELIFT
     std::vector<rclcpp::Subscription<bt_task_msgs::msg::LiftMotorMsg>::SharedPtr> subLiftMotors;
     #endif
@@ -68,6 +70,7 @@ public:
     #ifdef _USELIFT
     std::vector<BlockingDeque<bt_task_msgs::msg::LiftMotorMsg>> liftMotorMsgDeques;
     #endif
+    std::vector<BlockingDeque<data_msgs::msg::Instruction>> instructionTextDeques;
 
     std::vector<std::thread*> cameraColorSavingThreads;
     std::vector<std::thread*> cameraDepthSavingThreads;
@@ -210,6 +213,7 @@ public:
         #ifdef _USELIFT
         liftMotorMsgDeques = std::vector<BlockingDeque<bt_task_msgs::msg::LiftMotorMsg>>(liftMotorNames.size());
         #endif
+        instructionTextDeques = std::vector<BlockingDeque<data_msgs::msg::Instruction>>(instructionTextTopics.size());
 
         subCameraColors = std::vector<rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr>(cameraColorNames.size());
         subCameraDepths = std::vector<rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr>(cameraDepthNames.size());
@@ -224,6 +228,7 @@ public:
         #ifdef _USELIFT
         subLiftMotors = std::vector<rclcpp::Subscription<bt_task_msgs::msg::LiftMotorMsg>::SharedPtr>(liftMotorNames.size());
         #endif
+        subInstructionTexts = std::vector<rclcpp::Subscription<data_msgs::msg::Instruction>::SharedPtr>(instructionTextTopics.size());
 
         subCameraColorConfigs = std::vector<rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr>(cameraColorNames.size());
         subCameraDepthConfigs = std::vector<rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr>(cameraDepthNames.size());
@@ -368,6 +373,9 @@ public:
             subLiftMotors[i] = create_subscription<bt_task_msgs::msg::LiftMotorMsg>(liftMotorTopics[i], 2000, [this, i](const bt_task_msgs::msg::LiftMotorMsg::SharedPtr msg) { this->liftMotorHandler(msg, i);});
         }
         #endif
+        for(int i = 0; i < instructionTextTopics.size(); i++){
+            subInstructionTexts[i] = create_subscription<data_msgs::msg::Instruction>(instructionTextTopics[i], 2000, [this, i](const data_msgs::msg::Instruction::SharedPtr msg) { this->instructionTextHandler(msg, i);});
+        }
     }
 
     void run(){
@@ -843,6 +851,11 @@ public:
     }
     #endif
 
+    void instructionTextHandler(const data_msgs::msg::Instruction::SharedPtr& msg, const int& index){
+        instructionTextDeques.at(index).push_back(*msg);
+        instructionSaving();
+    }
+
     void cameraColorSaving(const int index){
         rclcpp::Rate rate(100);
         bool quit = false;
@@ -1258,11 +1271,37 @@ public:
             return;
         }
 
-        root["instructions"] = result;
+        root["full-instructions"] = result;
+        root["segment-instructions"] = Json::Value(Json::arrayValue);
         Json::StyledStreamWriter streamWriter;
         std::ofstream file(instructionsDir);
         streamWriter.write(file, root);
         file.close();
+    }
+        
+    void instructionSaving(){
+        Json::Reader jsonReader;
+        Json::Value root;
+        std::ifstream file(instructionsDir, std::iostream::binary);
+        jsonReader.parse(file, root);
+        file.close();
+        for (int i = 0; i < instructionTextDeques.size(); i++) {
+            while (instructionTextDeques.at(i).size()) {
+                Json::Value segment_instruction;
+                data_msgs::msg::Instruction instruction = instructionTextDeques.at(i).pop_front();
+                segment_instruction["start_time"] = rclcpp::Time(instruction.start_stamp).seconds();
+                segment_instruction["end_time"] = rclcpp::Time(instruction.end_stamp).seconds();
+                
+                segment_instruction["instructions"] = Json::Value(Json::arrayValue);
+                segment_instruction["instructions"].append(instruction.text);
+
+                root["segment-instructions"].append(segment_instruction);
+            }
+        }
+        Json::StyledStreamWriter streamWriter;
+        std::ofstream fileSave(instructionsDir);
+        streamWriter.write(fileSave, root);
+        fileSave.close();
     }
 
     // void keyboardInterruptChecking(){

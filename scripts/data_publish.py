@@ -92,7 +92,7 @@ class RosOperator(Node):
         joint_state_msg = JointState()
         joint_state_msg.header = Header()
         joint_state_msg.header.stamp = self.get_clock().now().to_msg()
-        joint_state_msg.name = [f'joint{i}' for i in range(len(joint_state))]
+        # joint_state_msg.name = [f'joint{i+1}' for i in range(len(joint_state))]
         joint_state_msg.position = [float(v) for v in joint_state]
         self.arm_joint_state_publishers[index].publish(joint_state_msg)
 
@@ -102,6 +102,9 @@ class RosOperator(Node):
         end_pose_msg.header.frame_id = "map"
         end_pose_msg.header.stamp = self.get_clock().now().to_msg()
         if self.args.arm_end_pose_orients[index]:
+            end_pose_msg.pose.position.x = end_pose[0]
+            end_pose_msg.pose.position.y = end_pose[1]
+            end_pose_msg.pose.position.z = end_pose[2]
             q = quaternion_from_euler(end_pose[3], end_pose[4], end_pose[5])
             end_pose_msg.pose.orientation.x = q[0]
             end_pose_msg.pose.orientation.y = q[1]
@@ -114,7 +117,7 @@ class RosOperator(Node):
             end_pose_msg.pose.orientation.x = end_pose[3]
             end_pose_msg.pose.orientation.y = end_pose[4]
             end_pose_msg.pose.orientation.z = end_pose[5]
-            end_pose_msg.pose.orientation.w = end_pose[6]
+            end_pose_msg.pose.orientation.w = end_pose[6] if len(end_pose) > 6
         self.arm_end_pose_publishers[index].publish(end_pose_msg)
 
     def publish_localization_pose(self, index, pose):
@@ -207,12 +210,9 @@ class RosOperator(Node):
         return pointcloud_msg
 
     def process_data(self):
-        episode_dir = os.path.join(self.args.datasetDir, self.args.episodeName)
-        data_path = os.path.join(episode_dir, 'data.hdf5')
-        if not os.path.exists(data_path):
-            data_path = os.path.join(self.args.datasetDir, self.args.episodeName + '.hdf5')
         self.rate = self.create_rate(self.args.publish_rate)
-        with h5py.File(data_path, 'r') as root:
+        episode_dir = os.path.dirname(self.args.datasetDir)
+        with h5py.File(self.args.datasetDir, 'r') as root:
             max_action_len = root['size'][()]
             if self.args.publishIndex != -1:
                 while rclpy.ok():
@@ -367,10 +367,8 @@ class RosOperator(Node):
 
 def get_arguments():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--datasetDir', action='store', type=str, help='datasetDir.',
+    parser.add_argument('--datasetDir', action='store', type=str, help='datasetDir .hdf5',
                         default="./data", required=False)
-    parser.add_argument('--episodeName', action='store', type=str, help='Episode name.',
-                        default="", required=False)
     parser.add_argument('--publishIndex', action='store', type=int, help='publishIndex',
                         default=-1, required=False)
     parser.add_argument('--type', action='store', type=str, help='type',
@@ -474,6 +472,17 @@ def get_arguments():
         args.robot_base_vel_topics = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('robotBase', {}).get('vel', {}).get('topics', [])
         args.lift_motor_names = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('lift', {}).get('motor', {}).get('names', [])
         args.lift_motor_topics = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('lift', {}).get('motor', {}).get('topics', [])
+
+    #for i in range(len(args.arm_end_pose_names)):
+    #    if args.arm_end_pose_names[i] == 'masterLeft':
+    #        args.arm_end_pose_topics[i] = '/piper_IK_l/ctrl_end_pose'
+    #    if args.arm_end_pose_names[i] == 'masterRight':
+    #        args.arm_end_pose_topics[i] = '/piper_IK_r/ctrl_end_pose'
+    # for i in range(len(args.arm_joint_state_names)):
+    #     if args.arm_joint_state_names[i] == 'masterLeft':
+    #         args.arm_joint_state_topics[i] = '/joint_states_l'
+    #     if args.arm_joint_state_names[i] == 'masterRight':
+    #         args.arm_joint_state_topics[i] = '/joint_states_r'
     return args
 
 

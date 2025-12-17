@@ -41,6 +41,7 @@ public:
     std::vector<std::string> lidarPointCloudTopics;
     std::vector<std::string> robotBaseVelTopics;
     std::vector<std::string> liftMotorTopics;
+    std::vector<std::string> instructionTextTopics;
 
     std::vector<std::string> cameraColorConfigTopics;
     std::vector<std::string> cameraDepthConfigTopics;
@@ -225,6 +226,7 @@ public:
         declare_parameter("dataInfo.lidar.pointCloud.topics", std::vector<std::string>());get_parameter("dataInfo.lidar.pointCloud.topics", lidarPointCloudTopics);
         declare_parameter("dataInfo.robotBase.vel.topics", std::vector<std::string>());get_parameter("dataInfo.robotBase.vel.topics", robotBaseVelTopics);
         declare_parameter("dataInfo.lift.motor.topics", std::vector<std::string>());get_parameter("dataInfo.lift.motor.topics", liftMotorTopics);
+        declare_parameter("dataInfo.instruction.text.topics", std::vector<std::string>());get_parameter("dataInfo.instruction.text.topics", instructionTextTopics);
 
         declare_parameter("dataInfo.camera.color.pubTopics", std::vector<std::string>());get_parameter("dataInfo.camera.color.pubTopics", cameraColorPublishTopics);
         declare_parameter("dataInfo.camera.depth.pubTopics", std::vector<std::string>());get_parameter("dataInfo.camera.depth.pubTopics", cameraDepthPublishTopics);

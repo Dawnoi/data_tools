@@ -241,7 +241,8 @@ def get_mcap_files(in_dir=""):
         for file in files:
             if file.endswith('.mcap'):
                 file_path = os.path.join(root, file)
-                file_list.append(file_path)
+                if not ("abnormal" in file_path):
+                    file_list.append(file_path)
     return file_list
 
 def main():
@@ -250,6 +251,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--datasetDir', action='store', type=str, help='datasetDir.',
                         default=os.getcwd(), required=False)
+    parser.add_argument('--targetDir', action='store', type=str, help='targetDir.',
+                        default="", required=False)
     parser.add_argument('--episodeIndex', action='store', type=int, help='Episode index.',
                         default=-1, required=False)
     parser.add_argument('--alohaYaml', action='store', type=str, help='alohaYaml.',
@@ -265,12 +268,14 @@ def main():
         data_dir = args.datasetDir
     if args.episodeIndex != -1:
         mcap_dir = os.path.join(mcap_dir, f"episode{args.episodeIndex}")
+    if args.targetDir != "":
+        data_dir = args.targetDir
 
     # 获取指定目录下所有mcap
     files = get_mcap_files(mcap_dir)
     print(f"转换的mcaps: {files}")
 
-    # 指定以某个yaml文件配置来将mcap转aloha数据
+    # # 指定以某个yaml文件配置来将mcap转aloha数据
     for file in files:
         process_file(file, data_dir, args.alohaYaml)
 

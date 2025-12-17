@@ -512,7 +512,7 @@ public:
 
     double checkDataAdequacy(bool print=false){
         bool result = true;
-        double time = INFINITY;
+        double time = -1;
         for(int i = 0; i < cameraColorNames.size() && result; i++){
             if(cameraColorToSyncs.at(i)){
                 if(cameraColorDataTimeSeries.at(i).size() == 0){
@@ -522,7 +522,7 @@ public:
                     result = false;
                 }
                 else
-                    time = time < cameraColorDataTimeSeries.at(i).back().time ? time : cameraColorDataTimeSeries.at(i).back().time;
+                    time = time > cameraColorDataTimeSeries.at(i).back().time ? time : cameraColorDataTimeSeries.at(i).back().time;
             }
         }
         for(int i = 0; i < cameraDepthNames.size() && result; i++){
@@ -534,7 +534,7 @@ public:
                     result = false;
                 }
                 else
-                    time = time < cameraDepthDataTimeSeries.at(i).back().time ? time : cameraDepthDataTimeSeries.at(i).back().time;
+                    time = time > cameraDepthDataTimeSeries.at(i).back().time ? time : cameraDepthDataTimeSeries.at(i).back().time;
             }
         }
         for(int i = 0; i < cameraPointCloudNames.size() && result; i++){
@@ -546,7 +546,7 @@ public:
                     result = false;
                 }
                 else
-                    time = time < cameraPointCloudDataTimeSeries.at(i).back().time ? time : cameraPointCloudDataTimeSeries.at(i).back().time;
+                    time = time > cameraPointCloudDataTimeSeries.at(i).back().time ? time : cameraPointCloudDataTimeSeries.at(i).back().time;
             }
         }
         for(int i = 0; i < armJointStateNames.size() && result; i++){
@@ -558,7 +558,7 @@ public:
                     result = false;
                 }
                 else
-                    time = time < armJointStateDataTimeSeries.at(i).back().time ? time : armJointStateDataTimeSeries.at(i).back().time;
+                    time = time > armJointStateDataTimeSeries.at(i).back().time ? time : armJointStateDataTimeSeries.at(i).back().time;
             }
         }
         for(int i = 0; i < armEndPoseNames.size() && result; i++){
@@ -570,7 +570,7 @@ public:
                     result = false;
                 }
                 else
-                    time = time < armEndPoseDataTimeSeries.at(i).back().time ? time : armEndPoseDataTimeSeries.at(i).back().time;
+                    time = time > armEndPoseDataTimeSeries.at(i).back().time ? time : armEndPoseDataTimeSeries.at(i).back().time;
             }
         }
         for(int i = 0; i < localizationPoseNames.size() && result; i++){
@@ -582,7 +582,7 @@ public:
                     result = false;
                 }
                 else
-                    time = time < localizationPoseDataTimeSeries.at(i).back().time ? time : localizationPoseDataTimeSeries.at(i).back().time;
+                    time = time > localizationPoseDataTimeSeries.at(i).back().time ? time : localizationPoseDataTimeSeries.at(i).back().time;
             }
         }
         for(int i = 0; i < gripperEncoderNames.size() && result; i++){
@@ -594,7 +594,7 @@ public:
                     result = false;
                 }
                 else
-                    time = time < gripperEncoderDataTimeSeries.at(i).back().time ? time : gripperEncoderDataTimeSeries.at(i).back().time;
+                    time = time > gripperEncoderDataTimeSeries.at(i).back().time ? time : gripperEncoderDataTimeSeries.at(i).back().time;
             }
         }
         for(int i = 0; i < imu9AxisNames.size() && result; i++){
@@ -606,7 +606,7 @@ public:
                     result = false;
                 }
                 else
-                    time = time < imu9AxisDataTimeSeries.at(i).back().time ? time : imu9AxisDataTimeSeries.at(i).back().time;
+                    time = time > imu9AxisDataTimeSeries.at(i).back().time ? time : imu9AxisDataTimeSeries.at(i).back().time;
             }
         }
         for(int i = 0; i < lidarPointCloudNames.size() && result; i++){
@@ -618,7 +618,7 @@ public:
                     result = false;
                 }
                 else
-                    time = time < lidarPointCloudDataTimeSeries.at(i).back().time ? time : lidarPointCloudDataTimeSeries.at(i).back().time;
+                    time = time > lidarPointCloudDataTimeSeries.at(i).back().time ? time : lidarPointCloudDataTimeSeries.at(i).back().time;
             }
         }
         for(int i = 0; i < robotBaseVelNames.size() && result; i++){
@@ -630,7 +630,7 @@ public:
                     result = false;
                 }
                 else
-                    time = time < robotBaseVelDataTimeSeries.at(i).back().time ? time : robotBaseVelDataTimeSeries.at(i).back().time;
+                    time = time > robotBaseVelDataTimeSeries.at(i).back().time ? time : robotBaseVelDataTimeSeries.at(i).back().time;
             }
         }
         for(int i = 0; i < liftMotorNames.size() && result; i++){
@@ -642,7 +642,7 @@ public:
                     result = false;
                 }
                 else
-                    time = time < liftMotorDataTimeSeries.at(i).back().time ? time : liftMotorDataTimeSeries.at(i).back().time;
+                    time = time > liftMotorDataTimeSeries.at(i).back().time ? time : liftMotorDataTimeSeries.at(i).back().time;
             }
         }
         return result ? time : INFINITY;
