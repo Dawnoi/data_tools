@@ -57,10 +57,13 @@ class Operator:
         self.arm_joint_state_dirs = [os.path.join(self.episode_dir, "arm/jointState", name) for name in self.args.armJointStateNames]
         self.arm_end_pose_dirs = [os.path.join(self.episode_dir, "arm/endPose", name) for name in self.args.armEndPoseNames]
         self.localization_pose_dirs = [os.path.join(self.episode_dir, "localization/pose", name) for name in self.args.localizationPoseNames]
+        self.force_6dim_dirs = [os.path.join(self.episode_dir, "force/6dim", name) for name in self.args.force6dimNames]
         self.gripper_encoder_dirs = [os.path.join(self.episode_dir, "gripper/encoder", name) for name in self.args.gripperEncoderNames]
         self.imu_9axis_dirs = [os.path.join(self.episode_dir, "imu/9axis", name) for name in self.args.imu9AxisNames]
+        self.array_float32_dirs = [os.path.join(self.episode_dir, "array/float32", name) for name in self.args.arrayFloat32Names]
         self.lidar_point_cloud_dirs = [os.path.join(self.episode_dir, "lidar/pointCloud", name) for name in self.args.lidarPointCloudNames]
-        self.robot_base_vel_dirs = [os.path.join(self.episode_dir, "robotBase/vel", name) for name in self.args.robotBaseVelNames]
+        self.robot_base_odometry_dirs = [os.path.join(self.episode_dir, "robotBase/odometry", name) for name in self.args.robotBaseOdometryNames]
+        self.robot_base_velocity_dirs = [os.path.join(self.episode_dir, "robotBase/velocity", name) for name in self.args.robotBaseVelocityNames]
         self.lift_motor_dirs = [os.path.join(self.episode_dir, "lift/motor", name) for name in self.args.liftMotorNames]
 
     def init_time_series(self):
@@ -72,10 +75,13 @@ class Operator:
         self.arm_joint_state_data_time_series = [[] for _ in self.args.armJointStateNames]
         self.arm_end_pose_data_time_series = [[] for _ in self.args.armEndPoseNames]
         self.localization_pose_data_time_series = [[] for _ in self.args.localizationPoseNames]
+        self.force_6dim_data_time_series = [[] for _ in self.args.force6dimNames]
         self.gripper_encoder_data_time_series = [[] for _ in self.args.gripperEncoderNames]
         self.imu_9axis_data_time_series = [[] for _ in self.args.imu9AxisNames]
+        self.array_float32_data_time_series = [[] for _ in self.args.arrayFloat32Names]
         self.lidar_point_cloud_data_time_series = [[] for _ in self.args.lidarPointCloudNames]
-        self.robot_base_vel_data_time_series = [[] for _ in self.args.robotBaseVelNames]
+        self.robot_base_odometry_data_time_series = [[] for _ in self.args.robotBaseOdometryNames]
+        self.robot_base_velocity_data_time_series = [[] for _ in self.args.robotBaseVelocityNames]
         self.lift_motor_data_time_series = [[] for _ in self.args.liftMotorNames]
         
         # 同步时间序列
@@ -85,10 +91,13 @@ class Operator:
         self.arm_joint_state_sync_time_series = [[] for _ in self.args.armJointStateNames]
         self.arm_end_pose_sync_time_series = [[] for _ in self.args.armEndPoseNames]
         self.localization_pose_sync_time_series = [[] for _ in self.args.localizationPoseNames]
+        self.force_6dim_sync_time_series = [[] for _ in self.args.force6dimNames]
         self.gripper_encoder_sync_time_series = [[] for _ in self.args.gripperEncoderNames]
         self.imu_9axis_sync_time_series = [[] for _ in self.args.imu9AxisNames]
+        self.array_float32_sync_time_series = [[] for _ in self.args.arrayFloat32Names]
         self.lidar_point_cloud_sync_time_series = [[] for _ in self.args.lidarPointCloudNames]
-        self.robot_base_vel_sync_time_series = [[] for _ in self.args.robotBaseVelNames]
+        self.robot_base_odometry_sync_time_series = [[] for _ in self.args.robotBaseOdometryNames]
+        self.robot_base_velocity_sync_time_series = [[] for _ in self.args.robotBaseVelocityNames]
         self.lift_motor_sync_time_series = [[] for _ in self.args.liftMotorNames]
         
         # 文件扩展名
@@ -98,10 +107,13 @@ class Operator:
         self.arm_joint_state_exts = [".json"] * len(self.args.armJointStateNames)
         self.arm_end_pose_exts = [".json"] * len(self.args.armEndPoseNames)
         self.localization_pose_exts = [".json"] * len(self.args.localizationPoseNames)
+        self.force_6dim_exts = [".json"] * len(self.args.force6dimNames)
         self.gripper_encoder_exts = [".json"] * len(self.args.gripperEncoderNames)
         self.imu_9axis_exts = [".json"] * len(self.args.imu9AxisNames)
+        self.array_float32_exts = [".npy"] * len(self.args.arrayFloat32Names)
         self.lidar_point_cloud_exts = [".json"] * len(self.args.lidarPointCloudNames)
-        self.robot_base_vel_exts = [".json"] * len(self.args.robotBaseVelNames)
+        self.robot_base_odometry_exts = [".json"] * len(self.args.robotBaseOdometryNames)
+        self.robot_base_velocity_exts = [".json"] * len(self.args.robotBaseVelocityNames)
         self.lift_motor_exts = [".json"] * len(self.args.liftMotorNames)
 
     def get_files_in_path(self, path: str, ext: str, data_list: List, sync_list: List) -> int:
@@ -164,6 +176,11 @@ class Operator:
                                          self.localization_pose_data_time_series[i], 
                                          self.localization_pose_sync_time_series[i])
 
+        for i, name in enumerate(self.args.force6dimNames):
+            count = self.get_files_in_path(self.force_6dim_dirs[i], ".json", 
+                                         self.force_6dim_data_time_series[i], 
+                                         self.force_6dim_sync_time_series[i])
+
         for i, name in enumerate(self.args.gripperEncoderNames):
             count = self.get_files_in_path(self.gripper_encoder_dirs[i], ".json", 
                                          self.gripper_encoder_data_time_series[i], 
@@ -174,15 +191,25 @@ class Operator:
                                          self.imu_9axis_data_time_series[i], 
                                          self.imu_9axis_sync_time_series[i])
 
+        for i, name in enumerate(self.args.arrayFloat32Names):
+            count = self.get_files_in_path(self.array_float32_dirs[i], ".npy", 
+                                         self.array_float32_data_time_series[i], 
+                                         self.array_float32_sync_time_series[i])
+
         for i, name in enumerate(self.args.lidarPointCloudNames):
             count = self.get_files_in_path(self.lidar_point_cloud_dirs[i], ".json", 
                                          self.lidar_point_cloud_data_time_series[i], 
                                          self.lidar_point_cloud_sync_time_series[i])
 
-        for i, name in enumerate(self.args.robotBaseVelNames):
-            count = self.get_files_in_path(self.robot_base_vel_dirs[i], ".json", 
-                                         self.robot_base_vel_data_time_series[i], 
-                                         self.robot_base_vel_sync_time_series[i])
+        for i, name in enumerate(self.args.robotBaseOdometryNames):
+            count = self.get_files_in_path(self.robot_base_odometry_dirs[i], ".json", 
+                                         self.robot_base_odometry_data_time_series[i], 
+                                         self.robot_base_odometry_sync_time_series[i])
+
+        for i, name in enumerate(self.args.robotBaseVelocityNames):
+            count = self.get_files_in_path(self.robot_base_velocity_dirs[i], ".json", 
+                                         self.robot_base_velocity_data_time_series[i], 
+                                         self.robot_base_velocity_sync_time_series[i])
 
         for i, name in enumerate(self.args.liftMotorNames):
             count = self.get_files_in_path(self.lift_motor_dirs[i], ".json", 
@@ -246,6 +273,14 @@ class Operator:
             else:
                 time = max(time, self.localization_pose_data_time_series[i][-1].time)
         
+        for i, name in enumerate(self.args.force6dimNames):
+            if len(self.force_6dim_data_time_series[i]) == 0:
+                if print_info:
+                    print(f"Force 6-dim {name} has no data")
+                result = False
+            else:
+                time = max(time, self.force_6dim_data_time_series[i][-1].time)
+        
         for i, name in enumerate(self.args.gripperEncoderNames):
             if len(self.gripper_encoder_data_time_series[i]) == 0:
                 if print_info:
@@ -262,6 +297,14 @@ class Operator:
             else:
                 time = max(time, self.imu_9axis_data_time_series[i][-1].time)
         
+        for i, name in enumerate(self.args.arrayFloat32Names):
+            if len(self.array_float32_data_time_series[i]) == 0:
+                if print_info:
+                    print(f"Array float32 {name} has no data")
+                result = False
+            else:
+                time = max(time, self.array_float32_data_time_series[i][-1].time)
+        
         for i, name in enumerate(self.args.lidarPointCloudNames):
             if len(self.lidar_point_cloud_data_time_series[i]) == 0:
                 if print_info:
@@ -270,13 +313,21 @@ class Operator:
             else:
                 time = max(time, self.lidar_point_cloud_data_time_series[i][-1].time)
         
-        for i, name in enumerate(self.args.robotBaseVelNames):
-            if len(self.robot_base_vel_data_time_series[i]) == 0:
+        for i, name in enumerate(self.args.robotBaseOdometryNames):
+            if len(self.robot_base_odometry_data_time_series[i]) == 0:
+                if print_info:
+                    print(f"Robot base odometry {name} has no data")
+                result = False
+            else:
+                time = max(time, self.robot_base_odometry_data_time_series[i][-1].time)
+
+        for i, name in enumerate(self.args.robotBaseVelocityNames):
+            if len(self.robot_base_velocity_data_time_series[i]) == 0:
                 if print_info:
                     print(f"Robot base velocity {name} has no data")
                 result = False
             else:
-                time = max(time, self.robot_base_vel_data_time_series[i][-1].time)
+                time = max(time, self.robot_base_velocity_data_time_series[i][-1].time)
         
         for i, name in enumerate(self.args.liftMotorNames):
             if len(self.lift_motor_data_time_series[i]) == 0:
@@ -391,6 +442,18 @@ class Operator:
                             break
                         closest_indices[f'arm_end_pose_{i}'] = closest_idx
                 
+                # 检查力矩数据
+                for i, name in enumerate(self.args.force6dimNames):
+                    if not time_diff_pass:
+                        break
+                    if self.force_6dim_data_time_series[i]:
+                        closest_idx, closest_diff = self.find_closest_index(
+                            self.force_6dim_data_time_series[i], frame_time)
+                        if closest_diff > self.args.timeDiffLimit:
+                            time_diff_pass = False
+                            break
+                        closest_indices[f'force_6dim_{i}'] = closest_idx
+                
                 # 检查夹爪编码器数据
                 for i, name in enumerate(self.args.gripperEncoderNames):
                     if not time_diff_pass:
@@ -415,6 +478,18 @@ class Operator:
                             break
                         closest_indices[f'imu_9axis_{i}'] = closest_idx
                 
+                # 检查数组浮点数据
+                for i, name in enumerate(self.args.arrayFloat32Names):
+                    if not time_diff_pass:
+                        break
+                    if self.array_float32_data_time_series[i]:
+                        closest_idx, closest_diff = self.find_closest_index(
+                            self.array_float32_data_time_series[i], frame_time)
+                        if closest_diff > self.args.timeDiffLimit:
+                            time_diff_pass = False
+                            break
+                        closest_indices[f'array_float32_{i}'] = closest_idx
+                
                 # 检查激光雷达点云数据
                 for i, name in enumerate(self.args.lidarPointCloudNames):
                     if not time_diff_pass:
@@ -428,16 +503,28 @@ class Operator:
                         closest_indices[f'lidar_point_cloud_{i}'] = closest_idx
                 
                 # 检查机器人底盘速度数据
-                for i, name in enumerate(self.args.robotBaseVelNames):
+                for i, name in enumerate(self.args.robotBaseOdometryNames):
                     if not time_diff_pass:
                         break
-                    if self.robot_base_vel_data_time_series[i]:
+                    if self.robot_base_odometry_data_time_series[i]:
                         closest_idx, closest_diff = self.find_closest_index(
-                            self.robot_base_vel_data_time_series[i], frame_time)
+                            self.robot_base_odometry_data_time_series[i], frame_time)
                         if closest_diff > self.args.timeDiffLimit:
                             time_diff_pass = False
                             break
-                        closest_indices[f'robot_base_vel_{i}'] = closest_idx
+                        closest_indices[f'robot_base_odometry_{i}'] = closest_idx
+                
+                # 检查机器人底盘速度数据
+                for i, name in enumerate(self.args.robotBaseVelocityNames):
+                    if not time_diff_pass:
+                        break
+                    if self.robot_base_velocity_data_time_series[i]:
+                        closest_idx, closest_diff = self.find_closest_index(
+                            self.robot_base_velocity_data_time_series[i], frame_time)
+                        if closest_diff > self.args.timeDiffLimit:
+                            time_diff_pass = False
+                            break
+                        closest_indices[f'robot_base_velocity_{i}'] = closest_idx
                 
                 # 检查升降电机数据
                 for i, name in enumerate(self.args.liftMotorNames):
@@ -496,6 +583,13 @@ class Operator:
                             self.localization_pose_data_time_series[i][idx].to_sync_list()
                             del self.localization_pose_data_time_series[i][:idx+1]
                     
+                    # 添加力矩数据到同步列表
+                    for i, name in enumerate(self.args.force6dimNames):
+                        if f'force_6dim_{i}' in closest_indices:
+                            idx = closest_indices[f'force_6dim_{i}']
+                            self.force_6dim_data_time_series[i][idx].to_sync_list()
+                            del self.force_6dim_data_time_series[i][:idx+1]
+                    
                     # 添加夹爪编码器数据到同步列表
                     for i, name in enumerate(self.args.gripperEncoderNames):
                         if f'gripper_encoder_{i}' in closest_indices:
@@ -510,6 +604,13 @@ class Operator:
                             self.imu_9axis_data_time_series[i][idx].to_sync_list()
                             del self.imu_9axis_data_time_series[i][:idx+1]
                     
+                    # 添加数组浮点数据到同步列表
+                    for i, name in enumerate(self.args.arrayFloat32Names):
+                        if f'array_float32_{i}' in closest_indices:
+                            idx = closest_indices[f'array_float32_{i}']
+                            self.array_float32_data_time_series[i][idx].to_sync_list()
+                            del self.array_float32_data_time_series[i][:idx+1]
+                    
                     # 添加激光雷达点云数据到同步列表
                     for i, name in enumerate(self.args.lidarPointCloudNames):
                         if f'lidar_point_cloud_{i}' in closest_indices:
@@ -518,11 +619,18 @@ class Operator:
                             del self.lidar_point_cloud_data_time_series[i][:idx+1]
                     
                     # 添加机器人底盘速度数据到同步列表
-                    for i, name in enumerate(self.args.robotBaseVelNames):
-                        if f'robot_base_vel_{i}' in closest_indices:
-                            idx = closest_indices[f'robot_base_vel_{i}']
-                            self.robot_base_vel_data_time_series[i][idx].to_sync_list()
-                            del self.robot_base_vel_data_time_series[i][:idx+1]
+                    for i, name in enumerate(self.args.robotBaseOdometryNames):
+                        if f'robot_base_odometry_{i}' in closest_indices:
+                            idx = closest_indices[f'robot_base_odometry_{i}']
+                            self.robot_base_odometry_data_time_series[i][idx].to_sync_list()
+                            del self.robot_base_odometry_data_time_series[i][:idx+1]
+                    
+                    # 添加机器人底盘速度数据到同步列表
+                    for i, name in enumerate(self.args.robotBaseVelocityNames):
+                        if f'robot_base_velocity_{i}' in closest_indices:
+                            idx = closest_indices[f'robot_base_velocity_{i}']
+                            self.robot_base_velocity_data_time_series[i][idx].to_sync_list()
+                            del self.robot_base_velocity_data_time_series[i][:idx+1]
                     
                     # 添加升降电机数据到同步列表
                     for i, name in enumerate(self.args.liftMotorNames):
@@ -591,6 +699,14 @@ class Operator:
                 for time_series in self.arm_end_pose_sync_time_series[i]:
                     f.write(f"{time_series.time:.6f}{self.arm_end_pose_exts[i]}\n")
 
+        # 写入力矩同步文件
+        for i, name in enumerate(self.args.force6dimNames):
+            sync_file_path = os.path.join(self.force_6dim_dirs[i], "sync.txt")
+            os.makedirs(os.path.dirname(sync_file_path), exist_ok=True)
+            with open(sync_file_path, 'w') as f:
+                for time_series in self.force_6dim_sync_time_series[i]:
+                    f.write(f"{time_series.time:.6f}{self.force_6dim_exts[i]}\n")
+
         # 写入夹爪编码器同步文件
         for i, name in enumerate(self.args.gripperEncoderNames):
             sync_file_path = os.path.join(self.gripper_encoder_dirs[i], "sync.txt")
@@ -607,6 +723,14 @@ class Operator:
                 for time_series in self.imu_9axis_sync_time_series[i]:
                     f.write(f"{time_series.time:.6f}{self.imu_9axis_exts[i]}\n")
 
+        # 写入数组浮点同步文件
+        for i, name in enumerate(self.args.arrayFloat32Names):
+            sync_file_path = os.path.join(self.array_float32_dirs[i], "sync.txt")
+            os.makedirs(os.path.dirname(sync_file_path), exist_ok=True)
+            with open(sync_file_path, 'w') as f:
+                for time_series in self.array_float32_sync_time_series[i]:
+                    f.write(f"{time_series.time:.6f}{self.array_float32_exts[i]}\n")
+
         # 写入激光雷达点云同步文件
         for i, name in enumerate(self.args.lidarPointCloudNames):
             sync_file_path = os.path.join(self.lidar_point_cloud_dirs[i], "sync.txt")
@@ -616,12 +740,20 @@ class Operator:
                     f.write(f"{time_series.time:.6f}{self.lidar_point_cloud_exts[i]}\n")
 
         # 写入机器人底盘速度同步文件
-        for i, name in enumerate(self.args.robotBaseVelNames):
-            sync_file_path = os.path.join(self.robot_base_vel_dirs[i], "sync.txt")
+        for i, name in enumerate(self.args.robotBaseOdometryNames):
+            sync_file_path = os.path.join(self.robot_base_odometry_dirs[i], "sync.txt")
             os.makedirs(os.path.dirname(sync_file_path), exist_ok=True)
             with open(sync_file_path, 'w') as f:
-                for time_series in self.robot_base_vel_sync_time_series[i]:
-                    f.write(f"{time_series.time:.6f}{self.robot_base_vel_exts[i]}\n")
+                for time_series in self.robot_base_odometry_sync_time_series[i]:
+                    f.write(f"{time_series.time:.6f}{self.robot_base_odometry_exts[i]}\n")
+        
+        # 写入机器人底盘速度同步文件
+        for i, name in enumerate(self.args.robotBaseVelocityNames):
+            sync_file_path = os.path.join(self.robot_base_velocity_dirs[i], "sync.txt")
+            os.makedirs(os.path.dirname(sync_file_path), exist_ok=True)
+            with open(sync_file_path, 'w') as f:
+                for time_series in self.robot_base_velocity_sync_time_series[i]:
+                    f.write(f"{time_series.time:.6f}{self.robot_base_velocity_exts[i]}\n")
 
         # 写入升降电机同步文件
         for i, name in enumerate(self.args.liftMotorNames):
@@ -657,13 +789,19 @@ def get_arguments():
                        default=[], required=False)
     parser.add_argument('--localizationPoseNames', action='store', type=str, help='localizationPoseNames',
                        default=[], required=False)
+    parser.add_argument('--force6dimNames', action='store', type=str, help='force6dimNames',
+                       default=[], required=False)
     parser.add_argument('--gripperEncoderNames', action='store', type=str, help='gripperEncoderNames',
                        default=[], required=False)
     parser.add_argument('--imu9AxisNames', action='store', type=str, help='imu9AxisNames',
                        default=[], required=False)
+    parser.add_argument('--arrayFloat32Names', action='store', type=str, help='arrayFloat32Names',
+                       default=[], required=False)
     parser.add_argument('--lidarPointCloudNames', action='store', type=str, help='lidarPointCloudNames',
                        default=[], required=False)
-    parser.add_argument('--robotBaseVelNames', action='store', type=str, help='robotBaseVelNames',
+    parser.add_argument('--robotBaseOdometryNames', action='store', type=str, help='robotBaseOdometryNames',
+                       default=[], required=False)
+    parser.add_argument('--robotBaseVelocityNames', action='store', type=str, help='robotBaseVelocityNames',
                        default=[], required=False)
     parser.add_argument('--liftMotorNames', action='store', type=str, help='liftMotorNames',
                        default=[], required=False)
@@ -677,10 +815,13 @@ def get_arguments():
         args.armJointStateNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('arm', {}).get('jointState', {}).get('names', [])
         args.armEndPoseNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('arm', {}).get('endPose', {}).get('names', [])
         args.localizationPoseNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('localization', {}).get('pose', {}).get('names', [])
+        args.force6dimNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('force', {}).get('6dim', {}).get('names', [])
         args.gripperEncoderNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('gripper', {}).get('encoder', {}).get('names', [])
         args.imu9AxisNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('imu', {}).get('9axis', {}).get('names', [])
+        args.arrayFloat32Names = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('array', {}).get('float32', {}).get('names', [])
         args.lidarPointCloudNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('lidar', {}).get('pointCloud', {}).get('names', [])
-        args.robotBaseVelNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('robotBase', {}).get('vel', {}).get('names', [])
+        args.robotBaseOdometryNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('robotBase', {}).get('odometry', {}).get('names', [])
+        args.robotBaseVelocityNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('robotBase', {}).get('velocity', {}).get('names', [])
         args.liftMotorNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('lift', {}).get('motor', {}).get('names', [])
     return args
 

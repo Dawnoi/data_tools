@@ -13,6 +13,10 @@ import json
 import cv2
 from scipy.spatial.transform import Rotation as R
 import yaml
+import warnings
+
+# Suppress the Python 2 header warning for .npy files created by dataCapture.cpp
+warnings.filterwarnings('ignore', message='.*required additional header parsing.*')
 
 
 def matrix_to_xyzrpy(matrix):
@@ -64,10 +68,13 @@ class Operator:
         self.armJointStateDirs = [os.path.join(self.episodeDir, "arm/jointState/" + self.args.armJointStateNames[i]) for i in range(len(self.args.armJointStateNames))]
         self.armEndPoseDirs = [os.path.join(self.episodeDir, "arm/endPose/" + self.args.armEndPoseNames[i]) for i in range(len(self.args.armEndPoseNames))]
         self.localizationPoseDirs = [os.path.join(self.episodeDir, "localization/pose/" + self.args.localizationPoseNames[i]) for i in range(len(self.args.localizationPoseNames))]
+        self.force6dimDirs = [os.path.join(self.episodeDir, "force/6dim/" + self.args.force6dimNames[i]) for i in range(len(self.args.force6dimNames))]
         self.gripperEncoderDirs = [os.path.join(self.episodeDir, "gripper/encoder/" + self.args.gripperEncoderNames[i]) for i in range(len(self.args.gripperEncoderNames))]
         self.imu9AxisDirs = [os.path.join(self.episodeDir, "imu/9axis/" + self.args.imu9AxisNames[i]) for i in range(len(self.args.imu9AxisNames))]
+        self.arrayFloat32Dirs = [os.path.join(self.episodeDir, "array/float32/" + self.args.arrayFloat32Names[i]) for i in range(len(self.args.arrayFloat32Names))]
         self.lidarPointCloudDirs = [os.path.join(self.episodeDir, "lidar/pointCloud/" + self.args.lidarPointCloudNames[i]) for i in range(len(self.args.lidarPointCloudNames))]
-        self.robotBaseVelDirs = [os.path.join(self.episodeDir, "robotBase/vel/" + self.args.robotBaseVelNames[i]) for i in range(len(self.args.robotBaseVelNames))]
+        self.robotBaseOdometryDirs = [os.path.join(self.episodeDir, "robotBase/odometry/" + self.args.robotBaseOdometryNames[i]) for i in range(len(self.args.robotBaseOdometryNames))]
+        self.robotBaseVelocityDirs = [os.path.join(self.episodeDir, "robotBase/velocity/" + self.args.robotBaseVelocityNames[i]) for i in range(len(self.args.robotBaseVelocityNames))]
         self.liftMotorDirs = [os.path.join(self.episodeDir, "lift/motor/" + self.args.liftMotorNames[i]) for i in range(len(self.args.liftMotorNames))]
         
         self.cameraColorSyncDirs = [os.path.join(self.cameraColorDirs[i], "sync.txt") for i in range(len(self.args.cameraColorNames))]
@@ -76,10 +83,13 @@ class Operator:
         self.armJointStateSyncDirs = [os.path.join(self.armJointStateDirs[i], "sync.txt") for i in range(len(self.args.armJointStateNames))]
         self.armEndPoseSyncDirs = [os.path.join(self.armEndPoseDirs[i], "sync.txt") for i in range(len(self.args.armEndPoseNames))]
         self.localizationPoseSyncDirs = [os.path.join(self.localizationPoseDirs[i], "sync.txt") for i in range(len(self.args.localizationPoseNames))]
+        self.force6dimSyncDirs = [os.path.join(self.force6dimDirs[i], "sync.txt") for i in range(len(self.args.force6dimNames))]
         self.gripperEncoderSyncDirs = [os.path.join(self.gripperEncoderDirs[i], "sync.txt") for i in range(len(self.args.gripperEncoderNames))]
         self.imu9AxisSyncDirs = [os.path.join(self.imu9AxisDirs[i], "sync.txt") for i in range(len(self.args.imu9AxisNames))]
+        self.arrayFloat32SyncDirs = [os.path.join(self.arrayFloat32Dirs[i], "sync.txt") for i in range(len(self.args.arrayFloat32Names))]
         self.lidarPointCloudSyncDirs = [os.path.join(self.lidarPointCloudDirs[i], "sync.txt") for i in range(len(self.args.lidarPointCloudNames))]
-        self.robotBaseVelSyncDirs = [os.path.join(self.robotBaseVelDirs[i], "sync.txt") for i in range(len(self.args.robotBaseVelNames))]
+        self.robotBaseOdometrySyncDirs = [os.path.join(self.robotBaseOdometryDirs[i], "sync.txt") for i in range(len(self.args.robotBaseOdometryNames))]
+        self.robotBaseVelocitySyncDirs = [os.path.join(self.robotBaseVelocityDirs[i], "sync.txt") for i in range(len(self.args.robotBaseVelocityNames))]
         self.liftMotorSyncDirs = [os.path.join(self.liftMotorDirs[i], "sync.txt") for i in range(len(self.args.liftMotorNames))]
 
         self.cameraColorConfigDirs = [os.path.join(self.cameraColorDirs[i], "config.json") for i in range(len(self.args.cameraColorNames))]
@@ -118,6 +128,8 @@ class Operator:
             data_dict[f'arm/endPose/{armEndPoseName}'] = []
         for localizationPoseName in self.args.localizationPoseNames:
             data_dict[f'localization/pose/{localizationPoseName}'] = []
+        for force6dimName in self.args.force6dimNames:
+            data_dict[f'force/6dim/{force6dimName}'] = []
         for gripperEncoderName in self.args.gripperEncoderNames:
             data_dict[f'gripper/encoderAngle/{gripperEncoderName}'] = []
             data_dict[f'gripper/encoderDistance/{gripperEncoderName}'] = []
@@ -125,10 +137,17 @@ class Operator:
             data_dict[f'imu/9axisOrientation/{imu9AxisName}'] = []
             data_dict[f'imu/9axisAngularVelocity/{imu9AxisName}'] = []
             data_dict[f'imu/9axisLinearAcceleration/{imu9AxisName}'] = []
+        for arrayFloat32Name in self.args.arrayFloat32Names:
+            data_dict[f'array/float32DimDescription/{arrayFloat32Name}'] = []
+            data_dict[f'array/float32Shape/{arrayFloat32Name}'] = []
+            data_dict[f'array/float32Data/{arrayFloat32Name}'] = []
         for lidarPointCloudName in self.args.lidarPointCloudNames:
             data_dict[f'lidar/pointCloud/{lidarPointCloudName}'] = []
-        for robotBaseVelName in self.args.robotBaseVelNames:
-            data_dict[f'robotBase/vel/{robotBaseVelName}'] = []
+        for robotBaseOdometryName in self.args.robotBaseOdometryNames:
+            data_dict[f'robotBase/odometryPose/{robotBaseOdometryName}'] = []
+            data_dict[f'robotBase/odometryVelocity/{robotBaseOdometryName}'] = []
+        for robotBaseVelocityName in self.args.robotBaseVelocityNames:
+            data_dict[f'robotBase/velocity/{robotBaseVelocityName}'] = []
         for liftMotorName in self.args.liftMotorNames:
             data_dict[f'lift/motor/{liftMotorName}'] = []
         data_dict[f'instructions/full_instructions/text'] = []
@@ -285,12 +304,12 @@ class Operator:
                         data = json.load(file)
                         # limit_lower = np.array([-2.6179, 0, -2.967, -1.745, -1.22, -2.09439, 0])
                         # limit_upper = np.array([2.6179, 3.14, 0, 1.745, 1.22, 2.09439, 0.10])
-                        limit_lower = np.array([-150*math.pi/180, 0, -170*math.pi/180, -100*math.pi/180, -70*math.pi/180, -120*math.pi/180, 0])
-                        limit_upper = np.array([150*math.pi/180, math.pi, 0, 100*math.pi/180, 70*math.pi/180, 120*math.pi/180, 0.10])
+                        limit_lower = np.array([-150*math.pi/180, 0, -170*math.pi/180, -105*math.pi/180, -76*math.pi/180, -175*math.pi/180, 0])
+                        limit_upper = np.array([150*math.pi/180, math.pi, 0, 105*math.pi/180, 76*math.pi/180, 175*math.pi/180, 0.10])
                         position = np.array(data['position'])
                         if master_arm_gripper_mm:
                             position[6] /= 1000
-                        out_limit = ((position - limit_lower) < -0.2).any() or ((limit_upper - position) < -0.2).any()
+                        out_limit = ((position - limit_lower) < -0.05).any() or ((limit_upper - position) < -0.05).any()
                         if out_limit:
                             error = True
                             print(self.args.armJointStateNames[i], position)
@@ -348,6 +367,24 @@ class Operator:
                     count += 1
                 if size_count == 0:
                     size_count = count
+        for i in range(len(self.args.force6dimNames)):
+            with open(self.force6dimSyncDirs[i], 'r') as lines:
+                count = 0
+                for t, line in enumerate(lines):
+                    if t % self.args.timeInterval != 0:
+                        continue
+                    line = line.replace('\n', '')
+                    time = float(line[:line.rfind(".")])
+                    if len(data_dict[f'timestamp']) <= count:
+                        data_dict[f'timestamp'].append(time)
+                    else:
+                        data_dict[f'timestamp'][count] = time if time < data_dict[f'timestamp'][count] else data_dict[f'timestamp'][count]
+                    with open(os.path.join(self.force6dimDirs[i], line), 'r') as file:
+                        data = json.load(file)
+                        data_dict[f'force/6dim/{self.args.force6dimNames[i]}'].append(np.array([data['force']['x'], data['force']['y'], data['force']['z'], data['torque']['x'], data['torque']['y'], data['torque']['z']]))
+                    count += 1
+                if size_count == 0:
+                    size_count = count
         for i in range(len(self.args.gripperEncoderNames)):
             with open(self.gripperEncoderSyncDirs[i], 'r') as lines:
                 count = 0
@@ -387,6 +424,59 @@ class Operator:
                     count += 1
                 if size_count == 0:
                     size_count = count
+        for i in range(len(self.args.arrayFloat32Names)):
+            with open(self.arrayFloat32SyncDirs[i], 'r') as lines:
+                count = 0
+                for t, line in enumerate(lines):
+                    if t % self.args.timeInterval != 0:
+                        continue
+                    line = line.replace('\n', '')
+                    time = float(line[:line.rfind(".")])
+                    if len(data_dict[f'timestamp']) <= count:
+                        data_dict[f'timestamp'].append(time)
+                    else:
+                        data_dict[f'timestamp'][count] = time if time < data_dict[f'timestamp'][count] else data_dict[f'timestamp'][count]
+                    
+                    filePath = os.path.join(self.arrayFloat32Dirs[i], line)
+                    
+                    # Load NPY structured array with np.load (now works with NPY 1.0 format)
+                    try:
+                        arr = np.load(filePath, allow_pickle=False)
+                        
+                        # Check if arr is a structured array
+                        if arr.dtype.names is None:
+                            print(f"Warning: {filePath} is not a structured array, skipping")
+                            continue
+                        
+                        # dataCapture.cpp writes 0-dimensional structured arrays with shape=()
+                        # Access fields directly for scalar structured arrays
+                        shapeData = arr['shape']
+                        dimDescData = arr['dim_description']
+                        data = arr['data']
+                        
+                    except Exception as e:
+                        print(f"Error loading {filePath}: {e}")
+                        print(f"Skipping this file and continuing...")
+                        continue
+                    
+                    # Convert shape to list
+                    shape = shapeData.tolist()
+                    
+                    # Decode dim_description: [count, len0, str0..., len1, str1...]
+                    dimDescription = []
+                    idx = 0
+                    descCount = int(dimDescData[idx]); idx += 1
+                    for _ in range(descCount):
+                        strLen = int(dimDescData[idx]); idx += 1
+                        dimDescription.append(''.join([chr(int(dimDescData[idx + j])) for j in range(strLen)]))
+                        idx += strLen
+                    
+                    data_dict[f'array/float32DimDescription/{self.args.arrayFloat32Names[i]}'].append(dimDescription)
+                    data_dict[f'array/float32Shape/{self.args.arrayFloat32Names[i]}'].append(shape)
+                    data_dict[f'array/float32Data/{self.args.arrayFloat32Names[i]}'].append(data.reshape(shape))
+                    count += 1
+                if size_count == 0:
+                    size_count = count
         for i in range(len(self.args.lidarPointCloudNames)):
             with open(self.lidarPointCloudSyncDirs[i], 'r') as lines:
                 count = 0
@@ -403,8 +493,8 @@ class Operator:
                     count += 1
                 if size_count == 0:
                     size_count = count
-        for i in range(len(self.args.robotBaseVelNames)):
-            with open(self.robotBaseVelSyncDirs[i], 'r') as lines:
+        for i in range(len(self.args.robotBaseOdometryNames)):
+            with open(self.robotBaseOdometrySyncDirs[i], 'r') as lines:
                 count = 0
                 for t, line in enumerate(lines):
                     if t % self.args.timeInterval != 0:
@@ -415,9 +505,28 @@ class Operator:
                         data_dict[f'timestamp'].append(time)
                     else:
                         data_dict[f'timestamp'][count] = time if time < data_dict[f'timestamp'][count] else data_dict[f'timestamp'][count]
-                    with open(os.path.join(self.robotBaseVelDirs[i], line), 'r') as file:
+                    with open(os.path.join(self.robotBaseOdometryDirs[i], line), 'r') as file:
                         data = json.load(file)
-                        data_dict[f'robotBase/vel/{self.args.robotBaseVelNames[i]}'].append(np.array([data['linear']['x'], data['linear']['y'], data['angular']['z']]))
+                        data_dict[f'robotBase/odometryPose/{self.args.robotBaseOdometryNames[i]}'].append(np.array([data['pose']['position']['x'], data['pose']['position']['y'], data['pose']['position']['z'], data['pose']['orientation']['x'], data['pose']['orientation']['y'], data['pose']['orientation']['z'], data['pose']['orientation']['w']]))
+                        data_dict[f'robotBase/odometryVelocity/{self.args.robotBaseOdometryNames[i]}'].append(np.array([data['twist']['linear']['x'], data['twist']['linear']['y'], data['twist']['linear']['z'], data['twist']['angular']['x'], data['twist']['angular']['y'], data['twist']['angular']['z']]))
+                    count += 1
+                if size_count == 0:
+                    size_count = count
+        for i in range(len(self.args.robotBaseVelocityNames)):
+            with open(self.robotBaseVelocitySyncDirs[i], 'r') as lines:
+                count = 0
+                for t, line in enumerate(lines):
+                    if t % self.args.timeInterval != 0:
+                        continue
+                    line = line.replace('\n', '')
+                    time = float(line[:line.rfind(".")])
+                    if len(data_dict[f'timestamp']) <= count:
+                        data_dict[f'timestamp'].append(time)
+                    else:
+                        data_dict[f'timestamp'][count] = time if time < data_dict[f'timestamp'][count] else data_dict[f'timestamp'][count]
+                    with open(os.path.join(self.robotBaseVelocityDirs[i], line), 'r') as file:
+                        data = json.load(file)
+                        data_dict[f'robotBase/velocity/{self.args.robotBaseVelocityNames[i]}'].append(np.array([data['linear']['x'], data['linear']['y'], data['linear']['z'], data['angular']['x'], data['angular']['y'], data['angular']['z']]))
                     count += 1
                 if size_count == 0:
                     size_count = count
@@ -440,7 +549,7 @@ class Operator:
                 if size_count == 0:
                     size_count = count
         data_dict['size'] = size_count
-        if True:  # not error:
+        if True:
             with h5py.File(self.dataFile, 'w', rdcc_nbytes=1024 ** 2 * 2) as root:
                 for key in data_dict:
                     root.create_dataset(key, data=data_dict[key])
@@ -477,13 +586,19 @@ def get_arguments():
                         default=[], required=False)
     parser.add_argument('--localizationPoseNames', action='store', type=str, help='localizationPoseNames',
                         default=[], required=False)
+    parser.add_argument('--force6dimNames', action='store', type=str, help='force6dimNames',
+                        default=[], required=False)
     parser.add_argument('--gripperEncoderNames', action='store', type=str, help='gripperEncoderNames',
                         default=[], required=False)
     parser.add_argument('--imu9AxisNames', action='store', type=str, help='imu9AxisNames',
                         default=[], required=False)
+    parser.add_argument('--arrayFloat32Names', action='store', type=str, help='arrayFloat32Names',
+                        default=[], required=False)
     parser.add_argument('--lidarPointCloudNames', action='store', type=str, help='lidarPointCloudNames',
                         default=[], required=False)
-    parser.add_argument('--robotBaseVelNames', action='store', type=str, help='robotBaseVelNames',
+    parser.add_argument('--robotBaseOdometryNames', action='store', type=str, help='robotBaseOdometryNames',
+                        default=[], required=False)
+    parser.add_argument('--robotBaseVelocityNames', action='store', type=str, help='robotBaseVelocityNames',
                         default=[], required=False)
     parser.add_argument('--liftMotorNames', action='store', type=str, help='liftMotorNames',
                         default=[], required=False)
@@ -497,10 +612,13 @@ def get_arguments():
         args.armJointStateNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('arm', {}).get('jointState', {}).get('names', [])
         args.armEndPoseNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('arm', {}).get('endPose', {}).get('names', [])
         args.localizationPoseNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('localization', {}).get('pose', {}).get('names', [])
+        args.force6dimNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('force', {}).get('6dim', {}).get('names', [])
         args.gripperEncoderNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('gripper', {}).get('encoder', {}).get('names', [])
         args.imu9AxisNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('imu', {}).get('9axis', {}).get('names', [])
+        args.arrayFloat32Names = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('array', {}).get('float32', {}).get('names', [])
         args.lidarPointCloudNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('lidar', {}).get('pointCloud', {}).get('names', [])
-        args.robotBaseVelNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('robotBase', {}).get('vel', {}).get('names', [])
+        args.robotBaseOdometryNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('robotBase', {}).get('odometry', {}).get('names', [])
+        args.robotBaseVelocityNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('robotBase', {}).get('velocity', {}).get('names', [])
         args.liftMotorNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('lift', {}).get('motor', {}).get('names', [])
         if args.useCameraPointCloud:
             args.cameraPointCloudNames = args.cameraDepthNames

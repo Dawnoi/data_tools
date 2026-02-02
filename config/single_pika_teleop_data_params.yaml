@@ -40,6 +40,16 @@
           names: ['pikaSensor', 'pikaGripper']
           topics: ['/sensor/gripper/data', '/gripper/gripper/data']
 
+      # force:
+      #   6dim:
+      #     names: []
+      #     topics: []
+
+      # array:
+      #   float32:
+      #     names: []
+      #     topics: []
+
       # imu:
       #   9axis:
       #     names: []
@@ -58,7 +68,10 @@
       #     downSizes: []
 
       # robotBase:
-      #   vel:
+      #   odometry:
+      #     names: []
+      #     topics: []
+      #   velocity:
       #     names: []
       #     topics: []
 

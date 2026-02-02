@@ -40,10 +40,20 @@
           names: ['pika']
           topics: ['/gripper/data']
 
-#      imu:
-#        9axis:
-#          names: []
-#          topics: []
+      # force:
+      #   6dim:
+      #     names: []
+      #     topics: []
+
+      # array:
+      #   float32:
+      #     names: []
+      #     topics: []
+
+      # imu:
+      #   9axis:
+      #     names: []
+      #     topics: []
 
       # lidar:
       #   pointCloud:
@@ -58,7 +68,10 @@
       #     downSizes: []
 
       # robotBase:
-      #   vel:
+      #   odometry:
+      #     names: []
+      #     topics: []
+      #   velocity:
       #     names: []
       #     topics: []
 

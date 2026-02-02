@@ -36,10 +36,13 @@ public:
     std::vector<rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr> subArmJointStates;
     std::vector<rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr> subArmEndPoses;
     std::vector<rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr> subLocalizationPoses;
+    std::vector<rclcpp::Subscription<geometry_msgs::msg::WrenchStamped>::SharedPtr> subForce6dims;
     std::vector<rclcpp::Subscription<data_msgs::msg::Gripper>::SharedPtr> subGripperEncoders;
     std::vector<rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr> subImu9Axiss;
+    std::vector<rclcpp::Subscription<data_msgs::msg::Array>::SharedPtr> subArrayFloat32s;
     std::vector<rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr> subLidarPointClouds;
-    std::vector<rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr> subRobotBaseVels;
+    std::vector<rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr> subRobotBaseOdometrys;
+    std::vector<rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr> subRobotBaseVelocitys;
     std::vector<rclcpp::Subscription<data_msgs::msg::Instruction>::SharedPtr> subInstructionTexts;
     #ifdef _USELIFT
     std::vector<rclcpp::Subscription<bt_task_msgs::msg::LiftMotorMsg>::SharedPtr> subLiftMotors;
@@ -53,8 +56,8 @@ public:
     // std::vector<rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr> subGripperEncoderConfigs;
     // std::vector<rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr> subImu9AxisConfigs;
     // std::vector<rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr> subLidarPointCloudConfigs;
-    // std::vector<rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr> subRobotBaseVelConfigs;
-
+    // std::vector<rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr> subrobotBaseOdometryConfigs;
+    // std::vector<rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr> subRobotBaseVelocityConfigs;
     rclcpp::Publisher<data_msgs::msg::CaptureStatus>::SharedPtr pubCaptureStatus;
 
     std::vector<BlockingDeque<sensor_msgs::msg::Image>> cameraColorMsgDeques;
@@ -63,10 +66,13 @@ public:
     std::vector<BlockingDeque<sensor_msgs::msg::JointState>> armJointStateMsgDeques;
     std::vector<BlockingDeque<geometry_msgs::msg::PoseStamped>> armEndPoseMsgDeques;
     std::vector<BlockingDeque<geometry_msgs::msg::PoseStamped>> localizationPoseMsgDeques;
+    std::vector<BlockingDeque<geometry_msgs::msg::WrenchStamped>> force6dimMsgDeques;
     std::vector<BlockingDeque<data_msgs::msg::Gripper>> gripperEncoderMsgDeques;
     std::vector<BlockingDeque<sensor_msgs::msg::Imu>> imu9AxisMsgDeques;
+    std::vector<BlockingDeque<data_msgs::msg::Array>> arrayFloat32MsgDeques;
     std::vector<BlockingDeque<sensor_msgs::msg::PointCloud2>> lidarPointCloudMsgDeques;
-    std::vector<BlockingDeque<nav_msgs::msg::Odometry>> robotBaseVelMsgDeques;
+    std::vector<BlockingDeque<nav_msgs::msg::Odometry>> robotBaseOdometryMsgDeques;
+    std::vector<BlockingDeque<geometry_msgs::msg::TwistStamped>> robotBaseVelocityMsgDeques;
     #ifdef _USELIFT
     std::vector<BlockingDeque<bt_task_msgs::msg::LiftMotorMsg>> liftMotorMsgDeques;
     #endif
@@ -78,10 +84,13 @@ public:
     std::vector<std::thread*> armJointStateSavingThreads;
     std::vector<std::thread*> armEndPoseSavingThreads;
     std::vector<std::thread*> localizationPoseSavingThreads;
+    std::vector<std::thread*> force6dimSavingThreads;
     std::vector<std::thread*> gripperEncoderSavingThreads;
     std::vector<std::thread*> imu9AxisSavingThreads;
+    std::vector<std::thread*> arrayFloat32SavingThreads;
     std::vector<std::thread*> lidarPointCloudSavingThreads;
-    std::vector<std::thread*> robotBaseVelSavingThreads;
+    std::vector<std::thread*> robotBaseOdometrysavingThreads;
+    std::vector<std::thread*> robotBaseVelocitySavingThreads;
     std::vector<std::thread*> liftMotorSavingThreads;
     std::vector<std::thread*> tfTransformSavingThreads;
 
@@ -91,10 +100,13 @@ public:
     std::vector<int> armJointStateMsgCounts;
     std::vector<int> armEndPoseMsgCounts;
     std::vector<int> localizationPoseMsgCounts;
+    std::vector<int> force6dimMsgCounts;
     std::vector<int> gripperEncoderMsgCounts;
     std::vector<int> imu9AxisMsgCounts;
+    std::vector<int> arrayFloat32MsgCounts;
     std::vector<int> lidarPointCloudMsgCounts;
-    std::vector<int> robotBaseVelMsgCounts;
+    std::vector<int> robotBaseOdometryMsgCounts;
+    std::vector<int> robotBaseVelocityMsgCounts;
     std::vector<int> liftMotorMsgCounts;
 
     std::vector<int> cameraColorConfigMsgCounts;
@@ -103,10 +115,13 @@ public:
     std::vector<int> armJointStateConfigMsgCounts;
     std::vector<int> armEndPoseConfigMsgCounts;
     std::vector<int> localizationPoseConfigMsgCounts;
+    std::vector<int> force6dimConfigMsgCounts;
     std::vector<int> gripperEncoderConfigMsgCounts;
     std::vector<int> imu9AxisConfigMsgCounts;
+    std::vector<int> arrayFloat32ConfigMsgCounts;
     std::vector<int> lidarPointCloudConfigMsgCounts;
-    std::vector<int> robotBaseVelConfigMsgCounts;
+    std::vector<int> robotBaseOdometryConfigMsgCounts;
+    std::vector<int> robotBaseVelocityConfigMsgCounts;
     std::vector<int> liftMotorConfigMsgCounts;
     std::vector<int> tfTransformMsgCounts;
     
@@ -116,10 +131,13 @@ public:
     std::vector<double> armJointStateStartTimeStamps;
     std::vector<double> armEndPoseStartTimeStamps;
     std::vector<double> localizationPoseStartTimeStamps;
+    std::vector<double> force6dimStartTimeStamps;
     std::vector<double> gripperEncoderStartTimeStamps;
     std::vector<double> imu9AxisStartTimeStamps;
+    std::vector<double> arrayFloat32StartTimeStamps;
     std::vector<double> lidarPointCloudStartTimeStamps;
-    std::vector<double> robotBaseVelStartTimeStamps;
+    std::vector<double> robotBaseOdometrystartTimeStamps;
+    std::vector<double> robotBaseVelocityStartTimeStamps;
     std::vector<double> liftMotorStartTimeStamps;
 
     std::vector<double> cameraColorLastTimeStamps;
@@ -128,10 +146,13 @@ public:
     std::vector<double> armJointStateLastTimeStamps;
     std::vector<double> armEndPoseLastTimeStamps;
     std::vector<double> localizationPoseLastTimeStamps;
+    std::vector<double> force6dimLastTimeStamps;
     std::vector<double> gripperEncoderLastTimeStamps;
     std::vector<double> imu9AxisLastTimeStamps;
+    std::vector<double> arrayFloat32LastTimeStamps;
     std::vector<double> lidarPointCloudLastTimeStamps;
-    std::vector<double> robotBaseVelLastTimeStamps;
+    std::vector<double> robotBaseOdometryLastTimeStamps;
+    std::vector<double> robotBaseVelocityLastTimeStamps;
     std::vector<double> liftMotorLastTimeStamps;
     
     std::vector<std::mutex> cameraColorMsgCountMtxs;
@@ -140,10 +161,13 @@ public:
     std::vector<std::mutex> armJointStateMsgCountMtxs;
     std::vector<std::mutex> armEndPoseMsgCountMtxs;
     std::vector<std::mutex> localizationPoseMsgCountMtxs;
+    std::vector<std::mutex> force6dimMsgCountMtxs;
     std::vector<std::mutex> gripperEncoderMsgCountMtxs;
     std::vector<std::mutex> imu9AxisMsgCountMtxs;
+    std::vector<std::mutex> arrayFloat32MsgCountMtxs;
     std::vector<std::mutex> lidarPointCloudMsgCountMtxs;
-    std::vector<std::mutex> robotBaseVelMsgCountMtxs;
+    std::vector<std::mutex> robotBaseOdometryMsgCountMtxs;
+    std::vector<std::mutex> robotBaseVelocityMsgCountMtxs;
     std::vector<std::mutex> liftMotorMsgCountMtxs;
     std::vector<std::mutex> tfTransformMsgCountMtxs;
 
@@ -153,10 +177,13 @@ public:
     std::vector<std::mutex> armJointStateConfigMsgCountMtxs;
     std::vector<std::mutex> armEndPoseConfigMsgCountMtxs;
     std::vector<std::mutex> localizationPoseConfigMsgCountMtxs;
+    std::vector<std::mutex> force6dimConfigMsgCountMtxs;
     std::vector<std::mutex> gripperEncoderConfigMsgCountMtxs;
     std::vector<std::mutex> imu9AxisConfigMsgCountMtxs;
+    std::vector<std::mutex> arrayFloat32ConfigMsgCountMtxs;
     std::vector<std::mutex> lidarPointCloudConfigMsgCountMtxs;
-    std::vector<std::mutex> robotBaseVelConfigMsgCountMtxs;
+    std::vector<std::mutex> robotBaseOdometryConfigMsgCountMtxs;
+    std::vector<std::mutex> robotBaseVelocityConfigMsgCountMtxs;
     std::vector<std::mutex> liftMotorConfigMsgCountMtxs;
 
     std::vector<std::string> cameraColorFrameIds;
@@ -193,10 +220,13 @@ public:
         unused = system((std::string("mkdir -p ") + armJointStateDir).c_str());
         unused = system((std::string("mkdir -p ") + armEndPoseDir).c_str());
         unused = system((std::string("mkdir -p ") + localizationPoseDir).c_str());
+        unused = system((std::string("mkdir -p ") + force6dimDir).c_str());
         unused = system((std::string("mkdir -p ") + gripperEncoderDir).c_str());
         unused = system((std::string("mkdir -p ") + imu9AxisDir).c_str());
+        unused = system((std::string("mkdir -p ") + arrayFloat32Dir).c_str());
         unused = system((std::string("mkdir -p ") + lidarPointCloudDir).c_str());
-        unused = system((std::string("mkdir -p ") + robotBaseVelDir).c_str());
+        unused = system((std::string("mkdir -p ") + robotBaseOdometryDir).c_str());
+        unused = system((std::string("mkdir -p ") + robotBaseVelocityDir).c_str());
         unused = system((std::string("mkdir -p ") + liftMotorDir).c_str());
         unused = system((std::string("mkdir -p ") + tfTransformDir).c_str());
 
@@ -206,10 +236,13 @@ public:
         armJointStateMsgDeques = std::vector<BlockingDeque<sensor_msgs::msg::JointState>>(armJointStateNames.size());
         armEndPoseMsgDeques = std::vector<BlockingDeque<geometry_msgs::msg::PoseStamped>>(armEndPoseNames.size());
         localizationPoseMsgDeques = std::vector<BlockingDeque<geometry_msgs::msg::PoseStamped>>(localizationPoseNames.size());
+        force6dimMsgDeques = std::vector<BlockingDeque<geometry_msgs::msg::WrenchStamped>>(force6dimNames.size());
         gripperEncoderMsgDeques = std::vector<BlockingDeque<data_msgs::msg::Gripper>>(gripperEncoderNames.size());
         imu9AxisMsgDeques = std::vector<BlockingDeque<sensor_msgs::msg::Imu>>(imu9AxisNames.size());
+        arrayFloat32MsgDeques = std::vector<BlockingDeque<data_msgs::msg::Array>>(arrayFloat32Names.size());
         lidarPointCloudMsgDeques = std::vector<BlockingDeque<sensor_msgs::msg::PointCloud2>>(lidarPointCloudNames.size());
-        robotBaseVelMsgDeques = std::vector<BlockingDeque<nav_msgs::msg::Odometry>>(robotBaseVelNames.size());
+        robotBaseOdometryMsgDeques = std::vector<BlockingDeque<nav_msgs::msg::Odometry>>(robotBaseOdometryNames.size());
+        robotBaseVelocityMsgDeques = std::vector<BlockingDeque<geometry_msgs::msg::TwistStamped>>(robotBaseVelocityNames.size());
         #ifdef _USELIFT
         liftMotorMsgDeques = std::vector<BlockingDeque<bt_task_msgs::msg::LiftMotorMsg>>(liftMotorNames.size());
         #endif
@@ -221,10 +254,13 @@ public:
         subArmJointStates = std::vector<rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr>(armJointStateNames.size());
         subArmEndPoses = std::vector<rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr>(armEndPoseNames.size());
         subLocalizationPoses = std::vector<rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr>(localizationPoseNames.size());
+        subForce6dims = std::vector<rclcpp::Subscription<geometry_msgs::msg::WrenchStamped>::SharedPtr>(force6dimNames.size());
         subGripperEncoders = std::vector<rclcpp::Subscription<data_msgs::msg::Gripper>::SharedPtr>(gripperEncoderNames.size());
         subImu9Axiss = std::vector<rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr>(imu9AxisNames.size());
+        subArrayFloat32s = std::vector<rclcpp::Subscription<data_msgs::msg::Array>::SharedPtr>(arrayFloat32Names.size());
         subLidarPointClouds = std::vector<rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr>(lidarPointCloudNames.size());
-        subRobotBaseVels = std::vector<rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr>(robotBaseVelNames.size());
+        subRobotBaseOdometrys = std::vector<rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr>(robotBaseOdometryNames.size());
+        subRobotBaseVelocitys = std::vector<rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr>(robotBaseVelocityNames.size());
         #ifdef _USELIFT
         subLiftMotors = std::vector<rclcpp::Subscription<bt_task_msgs::msg::LiftMotorMsg>::SharedPtr>(liftMotorNames.size());
         #endif
@@ -245,10 +281,13 @@ public:
         armJointStateMsgCounts = std::vector<int>(armJointStateNames.size(), 0);
         armEndPoseMsgCounts = std::vector<int>(armEndPoseNames.size(), 0);
         localizationPoseMsgCounts = std::vector<int>(localizationPoseNames.size(), 0);
+        force6dimMsgCounts = std::vector<int>(force6dimNames.size(), 0);
         gripperEncoderMsgCounts = std::vector<int>(gripperEncoderNames.size(), 0);
         imu9AxisMsgCounts = std::vector<int>(imu9AxisNames.size(), 0);
+        arrayFloat32MsgCounts = std::vector<int>(arrayFloat32Names.size(), 0);
         lidarPointCloudMsgCounts = std::vector<int>(lidarPointCloudNames.size(), 0);
-        robotBaseVelMsgCounts = std::vector<int>(robotBaseVelNames.size(), 0);
+        robotBaseOdometryMsgCounts = std::vector<int>(robotBaseOdometryNames.size(), 0);
+        robotBaseVelocityMsgCounts = std::vector<int>(robotBaseVelocityNames.size(), 0);
         liftMotorMsgCounts = std::vector<int>(liftMotorNames.size(), 0);
         tfTransformMsgCounts = std::vector<int>(tfTransformParentFrames.size(), 0);
 
@@ -258,11 +297,14 @@ public:
         armJointStateConfigMsgCounts = std::vector<int>(armJointStateNames.size(), 0);
         armEndPoseConfigMsgCounts = std::vector<int>(armEndPoseNames.size(), 0);
         localizationPoseConfigMsgCounts = std::vector<int>(localizationPoseNames.size(), 0);
+        force6dimConfigMsgCounts = std::vector<int>(force6dimNames.size(), 0);
         gripperEncoderConfigMsgCounts = std::vector<int>(gripperEncoderNames.size(), 0);
         imu9AxisConfigMsgCounts = std::vector<int>(imu9AxisNames.size(), 0);
+        arrayFloat32ConfigMsgCounts = std::vector<int>(arrayFloat32Names.size(), 0);
         lidarPointCloudConfigMsgCounts = std::vector<int>(lidarPointCloudNames.size(), 0);
+        robotBaseOdometryConfigMsgCounts = std::vector<int>(robotBaseOdometryNames.size(), 0);
+        robotBaseVelocityConfigMsgCounts = std::vector<int>(robotBaseVelocityNames.size(), 0);
         liftMotorConfigMsgCounts = std::vector<int>(liftMotorNames.size(), 0);
-        robotBaseVelConfigMsgCounts = std::vector<int>(robotBaseVelNames.size(), 0);
 
         cameraColorStartTimeStamps = std::vector<double>(cameraColorNames.size(), 0);
         cameraDepthStartTimeStamps = std::vector<double>(cameraDepthNames.size(), 0);
@@ -270,10 +312,13 @@ public:
         armJointStateStartTimeStamps = std::vector<double>(armJointStateNames.size(), 0);
         armEndPoseStartTimeStamps = std::vector<double>(armEndPoseNames.size(), 0);
         localizationPoseStartTimeStamps = std::vector<double>(localizationPoseNames.size(), 0);
+        force6dimStartTimeStamps = std::vector<double>(force6dimNames.size(), 0);
         gripperEncoderStartTimeStamps = std::vector<double>(gripperEncoderNames.size(), 0);
         imu9AxisStartTimeStamps = std::vector<double>(imu9AxisNames.size(), 0);
+        arrayFloat32StartTimeStamps = std::vector<double>(arrayFloat32Names.size(), 0);
         lidarPointCloudStartTimeStamps = std::vector<double>(lidarPointCloudNames.size(), 0);
-        robotBaseVelStartTimeStamps = std::vector<double>(robotBaseVelNames.size(), 0);
+        robotBaseOdometrystartTimeStamps = std::vector<double>(robotBaseOdometryNames.size(), 0);
+        robotBaseVelocityStartTimeStamps = std::vector<double>(robotBaseVelocityNames.size(), 0);
         liftMotorStartTimeStamps = std::vector<double>(liftMotorNames.size(), 0);
 
         cameraColorLastTimeStamps = std::vector<double>(cameraColorNames.size(), 0);
@@ -282,10 +327,13 @@ public:
         armJointStateLastTimeStamps = std::vector<double>(armJointStateNames.size(), 0);
         armEndPoseLastTimeStamps = std::vector<double>(armEndPoseNames.size(), 0);
         localizationPoseLastTimeStamps = std::vector<double>(localizationPoseNames.size(), 0);
+        force6dimLastTimeStamps = std::vector<double>(force6dimNames.size(), 0);
         gripperEncoderLastTimeStamps = std::vector<double>(gripperEncoderNames.size(), 0);
         imu9AxisLastTimeStamps = std::vector<double>(imu9AxisNames.size(), 0);
+        arrayFloat32LastTimeStamps = std::vector<double>(arrayFloat32Names.size(), 0);
         lidarPointCloudLastTimeStamps = std::vector<double>(lidarPointCloudNames.size(), 0);
-        robotBaseVelLastTimeStamps = std::vector<double>(robotBaseVelNames.size(), 0);
+        robotBaseOdometryLastTimeStamps = std::vector<double>(robotBaseOdometryNames.size(), 0);
+        robotBaseVelocityLastTimeStamps = std::vector<double>(robotBaseVelocityNames.size(), 0);
         liftMotorLastTimeStamps = std::vector<double>(liftMotorNames.size(), 0);
 
         cameraColorMsgCountMtxs = std::vector<std::mutex>(cameraColorNames.size());
@@ -294,10 +342,13 @@ public:
         armJointStateMsgCountMtxs = std::vector<std::mutex>(armJointStateNames.size());
         armEndPoseMsgCountMtxs = std::vector<std::mutex>(armEndPoseNames.size());
         localizationPoseMsgCountMtxs = std::vector<std::mutex>(localizationPoseNames.size());
+        force6dimMsgCountMtxs = std::vector<std::mutex>(force6dimNames.size());
         gripperEncoderMsgCountMtxs = std::vector<std::mutex>(gripperEncoderNames.size());
         imu9AxisMsgCountMtxs = std::vector<std::mutex>(imu9AxisNames.size());
+        arrayFloat32MsgCountMtxs = std::vector<std::mutex>(arrayFloat32Names.size());
         lidarPointCloudMsgCountMtxs = std::vector<std::mutex>(lidarPointCloudNames.size());
-        robotBaseVelMsgCountMtxs = std::vector<std::mutex>(robotBaseVelNames.size());
+        robotBaseOdometryMsgCountMtxs = std::vector<std::mutex>(robotBaseOdometryNames.size());
+        robotBaseVelocityMsgCountMtxs = std::vector<std::mutex>(robotBaseVelocityNames.size());
         liftMotorMsgCountMtxs = std::vector<std::mutex>(liftMotorNames.size());
         tfTransformMsgCountMtxs = std::vector<std::mutex>(tfTransformParentFrames.size());
 
@@ -307,10 +358,13 @@ public:
         armJointStateConfigMsgCountMtxs = std::vector<std::mutex>(armJointStateNames.size());
         armEndPoseConfigMsgCountMtxs = std::vector<std::mutex>(armEndPoseNames.size());
         localizationPoseConfigMsgCountMtxs = std::vector<std::mutex>(localizationPoseNames.size());
+        force6dimConfigMsgCountMtxs = std::vector<std::mutex>(force6dimNames.size());
         gripperEncoderConfigMsgCountMtxs = std::vector<std::mutex>(gripperEncoderNames.size());
         imu9AxisConfigMsgCountMtxs = std::vector<std::mutex>(imu9AxisNames.size());
+        arrayFloat32ConfigMsgCountMtxs = std::vector<std::mutex>(arrayFloat32Names.size());
         lidarPointCloudConfigMsgCountMtxs = std::vector<std::mutex>(lidarPointCloudNames.size());
-        robotBaseVelConfigMsgCountMtxs = std::vector<std::mutex>(robotBaseVelNames.size());
+        robotBaseOdometryConfigMsgCountMtxs = std::vector<std::mutex>(robotBaseOdometryNames.size());
+        robotBaseVelocityConfigMsgCountMtxs = std::vector<std::mutex>(robotBaseVelocityNames.size());
         liftMotorConfigMsgCountMtxs = std::vector<std::mutex>(liftMotorNames.size());
 
         cameraColorFrameIds = std::vector<std::string>(cameraColorNames.size(), "");
@@ -351,6 +405,10 @@ public:
             unused = system((std::string("mkdir -p ") + localizationPoseDirs.at(i)).c_str());
             subLocalizationPoses[i] = create_subscription<geometry_msgs::msg::PoseStamped>(localizationPoseTopics[i], 2000, [this, i](const geometry_msgs::msg::PoseStamped::SharedPtr msg) { this->localizationPoseHandler(msg, i);});
         }
+        for(int i = 0; i < force6dimNames.size(); i++){
+            unused = system((std::string("mkdir -p ") + force6dimDirs.at(i)).c_str());
+            subForce6dims[i] = create_subscription<geometry_msgs::msg::WrenchStamped>(force6dimTopics[i], 2000, [this, i](const geometry_msgs::msg::WrenchStamped::SharedPtr msg) { this->force6dimHandler(msg, i);});
+        }
         for(int i = 0; i < gripperEncoderNames.size(); i++){
             unused = system((std::string("mkdir -p ") + gripperEncoderDirs.at(i)).c_str());
             subGripperEncoders[i] = create_subscription<data_msgs::msg::Gripper>(gripperEncoderTopics[i], 2000, [this, i](const data_msgs::msg::Gripper::SharedPtr msg) { this->gripperEncoderHandler(msg, i);});
@@ -359,13 +417,21 @@ public:
             unused = system((std::string("mkdir -p ") + imu9AxisDirs.at(i)).c_str());
             subImu9Axiss[i] = create_subscription<sensor_msgs::msg::Imu>(imu9AxisTopics[i], 2000, [this, i](const sensor_msgs::msg::Imu::SharedPtr msg) { this->imu9AxisHandler(msg, i);});
         }
+        for(int i = 0; i < arrayFloat32Names.size(); i++){
+            unused = system((std::string("mkdir -p ") + arrayFloat32Dirs.at(i)).c_str());
+            subArrayFloat32s[i] = create_subscription<data_msgs::msg::Array>(arrayFloat32Topics[i], 2000, [this, i](const data_msgs::msg::Array::SharedPtr msg) { this->arrayFloat32Handler(msg, i);});
+        }
         for(int i = 0; i < lidarPointCloudNames.size(); i++){
             unused = system((std::string("mkdir -p ") + lidarPointCloudDirs.at(i)).c_str());
             subLidarPointClouds[i] = create_subscription<sensor_msgs::msg::PointCloud2>(lidarPointCloudTopics[i], 2000, [this, i](const sensor_msgs::msg::PointCloud2::SharedPtr msg) { this->lidarPointCloudHandler(msg, i);});
         }
-        for(int i = 0; i < robotBaseVelNames.size(); i++){
-            unused = system((std::string("mkdir -p ") + robotBaseVelDirs.at(i)).c_str());
-            subRobotBaseVels[i] = create_subscription<nav_msgs::msg::Odometry>(robotBaseVelTopics[i], 2000, [this, i](const nav_msgs::msg::Odometry::SharedPtr msg) { this->robotBaseVelHandler(msg, i);});
+        for(int i = 0; i < robotBaseOdometryNames.size(); i++){
+            unused = system((std::string("mkdir -p ") + robotBaseOdometryDirs.at(i)).c_str());
+            subRobotBaseOdometrys[i] = create_subscription<nav_msgs::msg::Odometry>(robotBaseOdometryTopics[i], 2000, [this, i](const nav_msgs::msg::Odometry::SharedPtr msg) { this->robotBaseOdometryHandler(msg, i);});
+        }
+        for(int i = 0; i < robotBaseVelocityNames.size(); i++){
+            unused = system((std::string("mkdir -p ") + robotBaseVelocityDirs.at(i)).c_str());
+            subRobotBaseVelocitys[i] = create_subscription<geometry_msgs::msg::TwistStamped>(robotBaseVelocityTopics[i], 2000, [this, i](const geometry_msgs::msg::TwistStamped::SharedPtr msg) { this->robotBaseVelocityHandler(msg, i);});
         }
         #ifdef _USELIFT
         for(int i = 0; i < liftMotorNames.size(); i++){
@@ -397,17 +463,26 @@ public:
         for(int i = 0; i < localizationPoseNames.size(); i++){
             localizationPoseSavingThreads.push_back(new std::thread(&DataCapture::localizationPoseSaving, this, i));
         }
+        for(int i = 0; i < force6dimNames.size(); i++){
+            force6dimSavingThreads.push_back(new std::thread(&DataCapture::force6dimSaving, this, i));
+        }
         for(int i = 0; i < gripperEncoderNames.size(); i++){
             gripperEncoderSavingThreads.push_back(new std::thread(&DataCapture::gripperEncoderSaving, this, i));
         }
         for(int i = 0; i < imu9AxisNames.size(); i++){
             imu9AxisSavingThreads.push_back(new std::thread(&DataCapture::imu9AxisSaving, this, i));
         }
+        for(int i = 0; i < arrayFloat32Names.size(); i++){
+            arrayFloat32SavingThreads.push_back(new std::thread(&DataCapture::arrayFloat32Saving, this, i));
+        }
         for(int i = 0; i < lidarPointCloudNames.size(); i++){
             lidarPointCloudSavingThreads.push_back(new std::thread(&DataCapture::lidarPointCloudSaving, this, i));
         }
-        for(int i = 0; i < robotBaseVelNames.size(); i++){
-            robotBaseVelSavingThreads.push_back(new std::thread(&DataCapture::robotBaseVelSaving, this, i));
+        for(int i = 0; i < robotBaseOdometryNames.size(); i++){
+            robotBaseOdometrysavingThreads.push_back(new std::thread(&DataCapture::robotBaseOdometrysaving, this, i));
+        }
+        for(int i = 0; i < robotBaseVelocityNames.size(); i++){
+            robotBaseVelocitySavingThreads.push_back(new std::thread(&DataCapture::robotBaseVelocitySaving, this, i));
         }
         #ifdef _USELIFT
         for(int i = 0; i < liftMotorNames.size(); i++){
@@ -454,6 +529,11 @@ public:
             delete localizationPoseSavingThreads.at(i);
             localizationPoseSavingThreads.at(i) = nullptr;
         }
+        for(int i = 0; i < force6dimNames.size(); i++){
+            force6dimSavingThreads.at(i)->join();
+            delete force6dimSavingThreads.at(i);
+            force6dimSavingThreads.at(i) = nullptr;
+        }
         for(int i = 0; i < gripperEncoderNames.size(); i++){
             gripperEncoderSavingThreads.at(i)->join();
             delete gripperEncoderSavingThreads.at(i);
@@ -464,15 +544,25 @@ public:
             delete imu9AxisSavingThreads.at(i);
             imu9AxisSavingThreads.at(i) = nullptr;
         }
+        for(int i = 0; i < arrayFloat32Names.size(); i++){
+            arrayFloat32SavingThreads.at(i)->join();
+            delete arrayFloat32SavingThreads.at(i);
+            arrayFloat32SavingThreads.at(i) = nullptr;
+        }
         for(int i = 0; i < lidarPointCloudNames.size(); i++){
             lidarPointCloudSavingThreads.at(i)->join();
             delete lidarPointCloudSavingThreads.at(i);
             lidarPointCloudSavingThreads.at(i) = nullptr;
         }
-        for(int i = 0; i < robotBaseVelNames.size(); i++){
-            robotBaseVelSavingThreads.at(i)->join();
-            delete robotBaseVelSavingThreads.at(i);
-            robotBaseVelSavingThreads.at(i) = nullptr;
+        for(int i = 0; i < robotBaseOdometryNames.size(); i++){
+            robotBaseOdometrysavingThreads.at(i)->join();
+            delete robotBaseOdometrysavingThreads.at(i);
+            robotBaseOdometrysavingThreads.at(i) = nullptr;
+        }
+        for(int i = 0; i < robotBaseVelocityNames.size(); i++){
+            robotBaseVelocitySavingThreads.at(i)->join();
+            delete robotBaseVelocitySavingThreads.at(i);
+            robotBaseVelocitySavingThreads.at(i) = nullptr;
         }
         for(int i = 0; i < liftMotorNames.size(); i++){
             liftMotorSavingThreads.at(i)->join();
@@ -794,6 +884,17 @@ public:
         localizationPoseMsgCounts.at(index) += 1;
     }
 
+    void force6dimHandler(const geometry_msgs::msg::WrenchStamped::SharedPtr& msg, const int& index){
+        force6dimMsgDeques.at(index).push_back(*msg);
+        std::lock_guard<std::mutex> lock(force6dimMsgCountMtxs.at(index));
+        if(force6dimMsgCounts.at(index) == 0){
+            force6dimStartTimeStamps.at(index) = rclcpp::Time(msg->header.stamp).seconds();
+        }else{
+            force6dimLastTimeStamps.at(index) = rclcpp::Time(msg->header.stamp).seconds();
+        }
+        force6dimMsgCounts.at(index) += 1;
+    }
+
     void gripperEncoderHandler(const data_msgs::msg::Gripper::SharedPtr& msg, const int& index){
         gripperEncoderMsgDeques.at(index).push_back(*msg);
         std::lock_guard<std::mutex> lock(gripperEncoderMsgCountMtxs.at(index));
@@ -816,6 +917,17 @@ public:
         imu9AxisMsgCounts.at(index) += 1;
     }
 
+    void arrayFloat32Handler(const data_msgs::msg::Array::SharedPtr& msg, const int& index){
+        arrayFloat32MsgDeques.at(index).push_back(*msg);
+        std::lock_guard<std::mutex> lock(arrayFloat32MsgCountMtxs.at(index));
+        if(arrayFloat32MsgCounts.at(index) == 0){
+            arrayFloat32StartTimeStamps.at(index) = rclcpp::Time(msg->header.stamp).seconds();
+        }else{
+            arrayFloat32LastTimeStamps.at(index) = rclcpp::Time(msg->header.stamp).seconds();
+        }
+        arrayFloat32MsgCounts.at(index) += 1;
+    }
+
     void lidarPointCloudHandler(const sensor_msgs::msg::PointCloud2::SharedPtr& msg, const int& index){
         lidarPointCloudMsgDeques.at(index).push_back(*msg);
         std::lock_guard<std::mutex> lock(lidarPointCloudMsgCountMtxs.at(index));
@@ -827,15 +939,26 @@ public:
         lidarPointCloudMsgCounts.at(index) += 1;
     }
 
-    void robotBaseVelHandler(const nav_msgs::msg::Odometry::SharedPtr& msg, const int& index){
-        robotBaseVelMsgDeques.at(index).push_back(*msg);
-        std::lock_guard<std::mutex> lock(robotBaseVelMsgCountMtxs.at(index));
-        if(robotBaseVelMsgCounts.at(index) == 0){
-            robotBaseVelStartTimeStamps.at(index) = rclcpp::Time(msg->header.stamp).seconds();
+    void robotBaseOdometryHandler(const nav_msgs::msg::Odometry::SharedPtr& msg, const int& index){
+        robotBaseOdometryMsgDeques.at(index).push_back(*msg);
+        std::lock_guard<std::mutex> lock(robotBaseOdometryMsgCountMtxs.at(index));
+        if(robotBaseOdometryMsgCounts.at(index) == 0){
+            robotBaseOdometrystartTimeStamps.at(index) = rclcpp::Time(msg->header.stamp).seconds();
         }else{
-            robotBaseVelLastTimeStamps.at(index) = rclcpp::Time(msg->header.stamp).seconds();
+            robotBaseOdometryLastTimeStamps.at(index) = rclcpp::Time(msg->header.stamp).seconds();
         }
-        robotBaseVelMsgCounts.at(index) += 1;
+        robotBaseOdometryMsgCounts.at(index) += 1;
+    }
+
+    void robotBaseVelocityHandler(const geometry_msgs::msg::TwistStamped::SharedPtr& msg, const int& index){
+        robotBaseVelocityMsgDeques.at(index).push_back(*msg);
+        std::lock_guard<std::mutex> lock(robotBaseVelocityMsgCountMtxs.at(index));
+        if(robotBaseVelocityMsgCounts.at(index) == 0){
+            robotBaseVelocityStartTimeStamps.at(index) = rclcpp::Time(msg->header.stamp).seconds();
+        }else{
+            robotBaseVelocityLastTimeStamps.at(index) = rclcpp::Time(msg->header.stamp).seconds();
+        }
+        robotBaseVelocityMsgCounts.at(index) += 1;
     }
 
     #ifdef _USELIFT
@@ -1060,6 +1183,31 @@ public:
         }
     }
 
+    void force6dimSaving(const int index){
+        while(true){
+            if(captureStopMtx.try_lock()){
+                bool stop = captureStop;
+                captureStopMtx.unlock();
+                if(stop && force6dimMsgDeques.at(index).size() == 0)
+                    break;
+            }
+            geometry_msgs::msg::WrenchStamped msg = force6dimMsgDeques.at(index).pop_front();
+            if(rclcpp::Time(msg.header.stamp).seconds() == 0)
+                break;
+            Json::Value root;
+            root["force"]["x"] = msg.wrench.force.x;
+            root["force"]["y"] = msg.wrench.force.y;
+            root["force"]["z"] = msg.wrench.force.z;
+            root["torque"]["x"] = msg.wrench.torque.x;
+            root["torque"]["y"] = msg.wrench.torque.y;
+            root["torque"]["z"] = msg.wrench.torque.z;
+            Json::StyledStreamWriter streamWriter;
+            std::ofstream file(force6dimDirs.at(index) + "/" + std::to_string(rclcpp::Time(msg.header.stamp).seconds()) + ".json");
+            streamWriter.write(file, root);
+            file.close();
+        }
+    }
+    
     void gripperEncoderSaving(const int index){
         while(true){
             if(captureStopMtx.try_lock()){
@@ -1110,6 +1258,82 @@ public:
         }
     }
 
+    void arrayFloat32Saving(const int index){
+        while(true){
+            if(captureStopMtx.try_lock()){
+                bool stop = captureStop;
+                captureStopMtx.unlock();
+                if(stop && arrayFloat32MsgDeques.at(index).size() == 0)
+                    break;
+            }
+            data_msgs::msg::Array msg = arrayFloat32MsgDeques.at(index).pop_front();
+            if(rclcpp::Time(msg.header.stamp).seconds() == 0)
+                break;
+            
+            std::string filePath = arrayFloat32Dirs.at(index) + "/" + std::to_string(rclcpp::Time(msg.header.stamp).seconds()) + ".npy";
+            std::ofstream file(filePath, std::ios::binary);
+            
+            // Use NPY structured array with separate named fields
+            // Fields: 'shape', 'dim_description', 'data'
+            // Each field is stored independently for clearer structure
+            
+            // Prepare shape data (uint32 array)
+            std::vector<uint32_t> shapeData = msg.shape;
+            
+            // Prepare dim_description data (encode as uint8 array: [count, len0, str0..., len1, str1...])
+            std::vector<uint8_t> dimDescData;
+            dimDescData.push_back(static_cast<uint8_t>(msg.dim_description.size()));
+            for(const auto& desc : msg.dim_description) {
+                dimDescData.push_back(static_cast<uint8_t>(desc.length()));
+                for(char c : desc) {
+                    dimDescData.push_back(static_cast<uint8_t>(c));
+                }
+            }
+            
+            // Write NPY 1.0 with structured dtype for compatibility with np.load()
+            const char magic[] = "\x93NUMPY";
+            file.write(magic, 6);
+            uint8_t versionMajor = 1, versionMinor = 0;
+            file.write(reinterpret_cast<const char*>(&versionMajor), 1);
+            file.write(reinterpret_cast<const char*>(&versionMinor), 1);
+            
+            // Build structured dtype with three separate fields (use double quotes for Python 3 compatibility)
+            // [("shape", "<u4", (shapeLen,)), ("dim_description", "|u1", (dimDescLen,)), ("data", "<f4", (dataLen,))]
+            std::string dtypeStr = "[(\"shape\", \"<u4\", (" + std::to_string(shapeData.size()) + ",)), ";
+            dtypeStr += "(\"dim_description\", \"|u1\", (" + std::to_string(dimDescData.size()) + ",)), ";
+            dtypeStr += "(\"data\", \"<f4\", (" + std::to_string(msg.data.size()) + ",))]";
+            std::string headerDict = "{\"descr\": " + dtypeStr + ", \"fortran_order\": False, \"shape\": (), }";
+            
+            // Calculate padding: header must end at 64-byte boundary (NPY 1.0 requirement)
+            // Total header = magic(6) + version(2) + headerLen(2) + headerDict + '\n' + padding
+            size_t prefixLen = 6 + 2 + 2;  // magic(6) + version(2) + headerLen(2)
+            std::string headerWithNewline = headerDict + "\n";
+            size_t totalBeforePadding = prefixLen + headerWithNewline.length();
+            
+            // Find padding needed to align to 64 bytes (changed from 16 to 64)
+            size_t padding = 0;
+            if (totalBeforePadding % 64 != 0) {
+                padding = 64 - (totalBeforePadding % 64);
+            }
+            
+            // Append padding spaces to header
+            for (size_t i = 0; i < padding; ++i) {
+                headerWithNewline += " ";
+            }
+            
+            // NPY 1.0 uses uint16 for header length (2 bytes)
+            uint16_t headerLenLe = static_cast<uint16_t>(headerWithNewline.length());
+            file.write(reinterpret_cast<const char*>(&headerLenLe), 2);
+            file.write(headerWithNewline.c_str(), headerWithNewline.length());
+            
+            // Write structured data: shape, dim_description, then data (in order of dtype)
+            file.write(reinterpret_cast<const char*>(shapeData.data()), shapeData.size() * sizeof(uint32_t));
+            file.write(reinterpret_cast<const char*>(dimDescData.data()), dimDescData.size() * sizeof(uint8_t));
+            file.write(reinterpret_cast<const char*>(msg.data.data()), msg.data.size() * sizeof(float));
+            file.close();
+        }
+    }
+
     void lidarPointCloudSaving(const int index){
         while(true){
             if(captureStopMtx.try_lock()){
@@ -1151,23 +1375,58 @@ public:
         }
     }
 
-    void robotBaseVelSaving(const int index){
+    void robotBaseOdometrysaving(const int index){
         while(true){
             if(captureStopMtx.try_lock()){
                 bool stop = captureStop;
                 captureStopMtx.unlock();
-                if(stop && robotBaseVelMsgDeques.at(index).size() == 0)
+                if(stop && robotBaseOdometryMsgDeques.at(index).size() == 0)
                     break;
             }
-            nav_msgs::msg::Odometry msg = robotBaseVelMsgDeques.at(index).pop_front();
+            nav_msgs::msg::Odometry msg = robotBaseOdometryMsgDeques.at(index).pop_front();
             if(rclcpp::Time(msg.header.stamp).seconds() == 0)
                 break;
             Json::Value root;
             root["linear"]["x"] = msg.twist.twist.linear.x;
             root["linear"]["y"] = msg.twist.twist.linear.y;
+            root["linear"]["z"] = msg.twist.twist.linear.z;
+            root["angular"]["x"] = msg.twist.twist.angular.x;
+            root["angular"]["y"] = msg.twist.twist.angular.y;
             root["angular"]["z"] = msg.twist.twist.angular.z;
+            root["position"]["x"] = msg.pose.pose.position.x;
+            root["position"]["y"] = msg.pose.pose.position.y;
+            root["position"]["z"] = msg.pose.pose.position.z;
+            root["orientation"]["x"] = msg.pose.pose.orientation.x;
+            root["orientation"]["y"] = msg.pose.pose.orientation.y;
+            root["orientation"]["z"] = msg.pose.pose.orientation.z;
+            root["orientation"]["w"] = msg.pose.pose.orientation.w;
             Json::StyledStreamWriter streamWriter;
-            std::ofstream file(robotBaseVelDirs.at(index) + "/" + std::to_string(rclcpp::Time(msg.header.stamp).seconds()) + ".json");
+            std::ofstream file(robotBaseOdometryDirs.at(index) + "/" + std::to_string(rclcpp::Time(msg.header.stamp).seconds()) + ".json");
+            streamWriter.write(file, root);
+            file.close();
+        }
+    }
+
+    void robotBaseVelocitySaving(const int index){
+        while(true){
+            if(captureStopMtx.try_lock()){
+                bool stop = captureStop;
+                captureStopMtx.unlock();
+                if(stop && robotBaseVelocityMsgDeques.at(index).size() == 0)
+                    break;
+            }
+            geometry_msgs::msg::TwistStamped msg = robotBaseVelocityMsgDeques.at(index).pop_front();
+            if(rclcpp::Time(msg.header.stamp).seconds() == 0)
+                break;
+            Json::Value root;
+            root["linear"]["x"] = msg.twist.linear.x;
+            root["linear"]["y"] = msg.twist.linear.y;
+            root["linear"]["z"] = msg.twist.linear.z;
+            root["angular"]["x"] = msg.twist.angular.x;
+            root["angular"]["y"] = msg.twist.angular.y;
+            root["angular"]["z"] = msg.twist.angular.z;
+            Json::StyledStreamWriter streamWriter;
+            std::ofstream file(robotBaseVelocityDirs.at(index) + "/" + std::to_string(rclcpp::Time(msg.header.stamp).seconds()) + ".json");
             streamWriter.write(file, root);
             file.close();
         }
@@ -1360,6 +1619,12 @@ public:
             msg.header.stamp = rclcpp::Time(0);
             localizationPoseMsgDeques.at(i).push_back(msg);
         }
+        for(int i = 0; i < force6dimNames.size(); i++){
+            subForce6dims.at(i).reset();
+            geometry_msgs::msg::WrenchStamped msg;
+            msg.header.stamp = rclcpp::Time(0);
+            force6dimMsgDeques.at(i).push_back(msg);
+        }
         for(int i = 0; i < gripperEncoderNames.size(); i++){
             subGripperEncoders.at(i).reset();
             data_msgs::msg::Gripper msg;
@@ -1372,17 +1637,29 @@ public:
             msg.header.stamp = rclcpp::Time(0);
             imu9AxisMsgDeques.at(i).push_back(msg);
         }
+        for(int i = 0; i < arrayFloat32Names.size(); i++){
+            subArrayFloat32s.at(i).reset();
+            data_msgs::msg::Array msg;
+            msg.header.stamp = rclcpp::Time(0);
+            arrayFloat32MsgDeques.at(i).push_back(msg);
+        }
         for(int i = 0; i < lidarPointCloudNames.size(); i++){
             subLidarPointClouds.at(i).reset();
             sensor_msgs::msg::PointCloud2 msg;
             msg.header.stamp = rclcpp::Time(0);
             lidarPointCloudMsgDeques.at(i).push_back(msg);
         }
-        for(int i = 0; i < robotBaseVelNames.size(); i++){
-            subRobotBaseVels.at(i).reset();
+        for(int i = 0; i < robotBaseOdometryNames.size(); i++){
+            subRobotBaseOdometrys.at(i).reset();
             nav_msgs::msg::Odometry msg;
             msg.header.stamp = rclcpp::Time(0);
-            robotBaseVelMsgDeques.at(i).push_back(msg);
+            robotBaseOdometryMsgDeques.at(i).push_back(msg);
+        }
+        for(int i = 0; i < robotBaseVelocityNames.size(); i++){
+            subRobotBaseVelocitys.at(i).reset();
+            geometry_msgs::msg::TwistStamped msg;
+            msg.header.stamp = rclcpp::Time(0);
+            robotBaseVelocityMsgDeques.at(i).push_back(msg);
         }
         #ifdef _USELIFT
         for(int i = 0; i < liftMotorNames.size(); i++){
@@ -1404,10 +1681,13 @@ public:
         std::vector<int> armJointStateMsgLastCounts = std::vector<int>(armJointStateNames.size(), 0);
         std::vector<int> armEndPoseMsgLastCounts = std::vector<int>(armEndPoseNames.size(), 0);
         std::vector<int> localizationPoseMsgLastCounts = std::vector<int>(localizationPoseNames.size(), 0);
+        std::vector<int> force6dimMsgLastCounts = std::vector<int>(force6dimNames.size(), 0);
         std::vector<int> gripperEncoderMsgLastCounts = std::vector<int>(gripperEncoderNames.size(), 0);
         std::vector<int> imu9AxisMsgLastCounts = std::vector<int>(imu9AxisNames.size(), 0);
+        std::vector<int> arrayFloat32MsgLastCounts = std::vector<int>(arrayFloat32Names.size(), 0);
         std::vector<int> lidarPointCloudMsgLastCounts = std::vector<int>(lidarPointCloudNames.size(), 0);
-        std::vector<int> robotBaseVelMsgLastCounts = std::vector<int>(robotBaseVelNames.size(), 0);
+        std::vector<int> robotBaseOdometryMsgLastCounts = std::vector<int>(robotBaseOdometryNames.size(), 0);
+        std::vector<int> robotBaseVelocityMsgLastCounts = std::vector<int>(robotBaseVelocityNames.size(), 0);
         std::vector<int> liftMotorMsgLastCounts = std::vector<int>(liftMotorNames.size(), 0);
         std::vector<double> cameraColorMsgLastUpHzTimes = std::vector<double>(cameraColorNames.size(), 0);
         std::vector<double> cameraDepthMsgLastUpHzTimes = std::vector<double>(cameraDepthNames.size(), 0);
@@ -1415,10 +1695,13 @@ public:
         std::vector<double> armJointStateMsgLastUpHzTimes = std::vector<double>(armJointStateNames.size(), 0);
         std::vector<double> armEndPoseMsgLastUpHzTimes = std::vector<double>(armEndPoseNames.size(), 0);
         std::vector<double> localizationPoseMsgLastUpHzTimes = std::vector<double>(localizationPoseNames.size(), 0);
+        std::vector<double> force6dimMsgLastUpHzTimes = std::vector<double>(force6dimNames.size(), 0);
         std::vector<double> gripperEncoderMsgLastUpHzTimes = std::vector<double>(gripperEncoderNames.size(), 0);
         std::vector<double> imu9AxisMsgLastUpHzTimes = std::vector<double>(imu9AxisNames.size(), 0);
+        std::vector<double> arrayFloat32MsgLastUpHzTimes = std::vector<double>(arrayFloat32Names.size(), 0);
         std::vector<double> lidarPointCloudMsgLastUpHzTimes = std::vector<double>(lidarPointCloudNames.size(), 0);
-        std::vector<double> robotBaseVelMsgLastUpHzTimes = std::vector<double>(robotBaseVelNames.size(), 0);
+        std::vector<double> robotBaseOdometryMsgLastUpHzTimes = std::vector<double>(robotBaseOdometryNames.size(), 0);
+        std::vector<double> robotBaseVelocityMsgLastUpHzTimes = std::vector<double>(robotBaseVelocityNames.size(), 0);
         std::vector<double> liftMotorMsgLastUpHzTimes = std::vector<double>(liftMotorNames.size(), 0);
         rclcpp::Time beginTime = rclcpp::Clock().now();
         data_msgs::msg::CaptureStatus captureStatus;
@@ -1600,6 +1883,33 @@ public:
                 captureStatus.count_in_seconds.push_back(countInSecond);
                 captureStatus.frequencies.push_back(frequency);
             }
+            for(int i = 0; i < force6dimNames.size(); i++){
+                force6dimMsgCountMtxs.at(i).lock();
+                int count = force6dimMsgCounts.at(i);
+                double startTime = force6dimStartTimeStamps.at(i);
+                double lastTime = force6dimLastTimeStamps.at(i);
+                force6dimMsgCountMtxs.at(i).unlock();
+                int countInSecond = count - force6dimMsgLastCounts.at(i);
+                double frequency = ((double)count / (lastTime - startTime));
+                std::cout<<force6dimTopics.at(i)<<": "<<countInSecond<<" / "<<count<<"("<<frequency<<"hz)"<<std::endl;
+                if(force6dimMsgLastUpHzTimes.at(i) == 0){
+                    force6dimMsgLastUpHzTimes.at(i) = rclcpp::Clock().now().seconds();
+                }
+                if(this->hz != -1 && countInSecond <= this->hz){
+                    if(rclcpp::Clock().now().seconds() - force6dimMsgLastUpHzTimes.at(i) > this->timeout){
+                        std::cout<<"Check the frequency of "<<force6dimTopics.at(i)<<std::endl;
+                        captureStatus.fail = true;
+                    }
+                }else{
+                    force6dimMsgLastUpHzTimes.at(i) = rclcpp::Clock().now().seconds();
+                }
+                force6dimMsgLastCounts.at(i) = count;
+                allCount += count;
+                file<<"force/6dim/"<<force6dimNames.at(i)<<" "<<count<<" "<<frequency<<std::endl;
+                captureStatus.topics.push_back(force6dimTopics.at(i));
+                captureStatus.count_in_seconds.push_back(countInSecond);
+                captureStatus.frequencies.push_back(frequency);
+            }
             for(int i = 0; i < gripperEncoderNames.size(); i++){
                 gripperEncoderMsgCountMtxs.at(i).lock();
                 int count = gripperEncoderMsgCounts.at(i);
@@ -1654,6 +1964,33 @@ public:
                 captureStatus.count_in_seconds.push_back(countInSecond);
                 captureStatus.frequencies.push_back(frequency);
             }
+            for(int i = 0; i < arrayFloat32Names.size(); i++){
+                arrayFloat32MsgCountMtxs.at(i).lock();
+                int count = arrayFloat32MsgCounts.at(i);
+                double startTime = arrayFloat32StartTimeStamps.at(i);
+                double lastTime = arrayFloat32LastTimeStamps.at(i);
+                arrayFloat32MsgCountMtxs.at(i).unlock();
+                int countInSecond = count - arrayFloat32MsgLastCounts.at(i);
+                double frequency = ((double)count / (lastTime - startTime));
+                std::cout<<arrayFloat32Topics.at(i)<<": "<<countInSecond<<" / "<<count<<"("<<frequency<<"hz)"<<std::endl;
+                if(arrayFloat32MsgLastUpHzTimes.at(i) == 0){
+                    arrayFloat32MsgLastUpHzTimes.at(i) = rclcpp::Clock().now().seconds();
+                }
+                if(this->hz != -1 && countInSecond <= this->hz){
+                    if(rclcpp::Clock().now().seconds() - arrayFloat32MsgLastUpHzTimes.at(i) > this->timeout){
+                        std::cout<<"Check the frequency of "<<arrayFloat32Topics.at(i)<<std::endl;
+                        captureStatus.fail = true;
+                    }
+                }else{
+                    arrayFloat32MsgLastUpHzTimes.at(i) = rclcpp::Clock().now().seconds();
+                }
+                arrayFloat32MsgLastCounts.at(i) = count;
+                allCount += count;
+                file<<"array/float32/"<<arrayFloat32Names.at(i)<<" "<<count<<" "<<frequency<<std::endl;
+                captureStatus.topics.push_back(arrayFloat32Topics.at(i));
+                captureStatus.count_in_seconds.push_back(countInSecond);
+                captureStatus.frequencies.push_back(frequency);
+            }
             for(int i = 0; i < lidarPointCloudNames.size(); i++){
                 lidarPointCloudMsgCountMtxs.at(i).lock();
                 int count = lidarPointCloudMsgCounts.at(i);
@@ -1681,30 +2018,57 @@ public:
                 captureStatus.count_in_seconds.push_back(countInSecond);
                 captureStatus.frequencies.push_back(frequency);
             }
-            for(int i = 0; i < robotBaseVelNames.size(); i++){
-                robotBaseVelMsgCountMtxs.at(i).lock();
-                int count = robotBaseVelMsgCounts.at(i);
-                double startTime = robotBaseVelStartTimeStamps.at(i);
-                double lastTime = robotBaseVelLastTimeStamps.at(i);
-                robotBaseVelMsgCountMtxs.at(i).unlock();
-                int countInSecond = count - robotBaseVelMsgLastCounts.at(i);
+            for(int i = 0; i < robotBaseOdometryNames.size(); i++){
+                robotBaseOdometryMsgCountMtxs.at(i).lock();
+                int count = robotBaseOdometryMsgCounts.at(i);
+                double startTime = robotBaseOdometrystartTimeStamps.at(i);
+                double lastTime = robotBaseOdometryLastTimeStamps.at(i);
+                robotBaseOdometryMsgCountMtxs.at(i).unlock();
+                int countInSecond = count - robotBaseOdometryMsgLastCounts.at(i);
                 double frequency = ((double)count / (lastTime - startTime));
-                std::cout<<robotBaseVelTopics.at(i)<<": "<<countInSecond<<" / "<<count<<"("<<frequency<<"hz)"<<std::endl;
-                if(robotBaseVelMsgLastUpHzTimes.at(i) == 0){
-                    robotBaseVelMsgLastUpHzTimes.at(i) = rclcpp::Clock().now().seconds();
+                std::cout<<robotBaseOdometryTopics.at(i)<<": "<<countInSecond<<" / "<<count<<"("<<frequency<<"hz)"<<std::endl;
+                if(robotBaseOdometryMsgLastUpHzTimes.at(i) == 0){
+                    robotBaseOdometryMsgLastUpHzTimes.at(i) = rclcpp::Clock().now().seconds();
                 }
                 if(this->hz != -1 && countInSecond <= this->hz){
-                    if(rclcpp::Clock().now().seconds() - robotBaseVelMsgLastUpHzTimes.at(i) > this->timeout){
-                        std::cout<<"Check the frequency of "<<robotBaseVelTopics.at(i)<<std::endl;
+                    if(rclcpp::Clock().now().seconds() - robotBaseOdometryMsgLastUpHzTimes.at(i) > this->timeout){
+                        std::cout<<"Check the frequency of "<<robotBaseOdometryTopics.at(i)<<std::endl;
                         captureStatus.fail = true;
                     }
                 }else{
-                    robotBaseVelMsgLastUpHzTimes.at(i) = rclcpp::Clock().now().seconds();
+                    robotBaseOdometryMsgLastUpHzTimes.at(i) = rclcpp::Clock().now().seconds();
                 }
-                robotBaseVelMsgLastCounts.at(i) = count;
+                robotBaseOdometryMsgLastCounts.at(i) = count;
                 allCount += count;
-                file<<"robotBase/vel/"<<robotBaseVelNames.at(i)<<" "<<count<<" "<<frequency<<std::endl;
-                captureStatus.topics.push_back(robotBaseVelTopics.at(i));
+                file<<"robotBase/odometry/"<<robotBaseOdometryNames.at(i)<<" "<<count<<" "<<frequency<<std::endl;
+                captureStatus.topics.push_back(robotBaseOdometryTopics.at(i));
+                captureStatus.count_in_seconds.push_back(countInSecond);
+                captureStatus.frequencies.push_back(frequency);
+            }
+            for(int i = 0; i < robotBaseVelocityNames.size(); i++){
+                robotBaseVelocityMsgCountMtxs.at(i).lock();
+                int count = robotBaseVelocityMsgCounts.at(i);
+                double startTime = robotBaseVelocityStartTimeStamps.at(i);
+                double lastTime = robotBaseVelocityLastTimeStamps.at(i);
+                robotBaseVelocityMsgCountMtxs.at(i).unlock();
+                int countInSecond = count - robotBaseVelocityMsgLastCounts.at(i);
+                double frequency = ((double)count / (lastTime - startTime));
+                std::cout<<robotBaseVelocityTopics.at(i)<<": "<<countInSecond<<" / "<<count<<"("<<frequency<<"hz)"<<std::endl;
+                if(robotBaseVelocityMsgLastUpHzTimes.at(i) == 0){
+                    robotBaseVelocityMsgLastUpHzTimes.at(i) = rclcpp::Clock().now().seconds();
+                }
+                if(this->hz != -1 && countInSecond <= this->hz){
+                    if(rclcpp::Clock().now().seconds() - robotBaseVelocityMsgLastUpHzTimes.at(i) > this->timeout){
+                        std::cout<<"Check the frequency of "<<robotBaseVelocityTopics.at(i)<<std::endl;
+                        captureStatus.fail = true;
+                    }
+                }else{
+                    robotBaseVelocityMsgLastUpHzTimes.at(i) = rclcpp::Clock().now().seconds();
+                }
+                robotBaseVelocityMsgLastCounts.at(i) = count;
+                allCount += count;
+                file<<"robotBase/velocity/"<<robotBaseVelocityNames.at(i)<<" "<<count<<" "<<frequency<<std::endl;
+                captureStatus.topics.push_back(robotBaseVelocityTopics.at(i));
                 captureStatus.count_in_seconds.push_back(countInSecond);
                 captureStatus.frequencies.push_back(frequency);
             }
@@ -1928,6 +2292,16 @@ class DataCaptureService: public rclcpp::Node{
                         }else{
                             res->success = false;
                         }
+                    }else{
+                        if(req->dataset_dir != ""){
+                            datasetDir = req->dataset_dir;
+                        }
+                        if(req->episode_index != -1){
+                            episodeIndex = req->episode_index;
+                        }else{
+                            episodeIndex = episodeIndex - 1;
+                        }
+                        int unused = system((std::string("rm -rf ") + datasetDir + "/episode" + std::to_string(episodeIndex)).c_str());
                     }
                 }
             };

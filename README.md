@@ -16,41 +16,35 @@
 
 These are ARIO dataset tools. Data collection, data saving, and data publishing codes are included. The data is saved in a fixed format. For details on the format, see Directory structure translation.
 
-## Testing environment
-
-![build](https://img.shields.io/badge/build-catkin_make-blue.svg)
-[![PCL](https://img.shields.io/badge/PCL-1.10.0-blue.svg)](https://github.com/PointCloudLibrary/pcl/tree/pcl-1.10.0)
-[![rapidyaml](https://img.shields.io/badge/rapidyaml-v0.5.0-blue.svg)](https://github.com/biojppm/rapidyaml/tree/b35ccb150282760cf5c2d316895cb86bd161ac89)
-[![rapidjson](https://img.shields.io/badge/rapidjson-v1.1.0-blue.svg)](https://github.com/Tencent/rapidjson/tree/f54b0e47a08782a6131cc3d60f94d038fa6e0a51)
-
 ## Installation
 
-Download our source code, and place this package in the workspace {YOUR_WS}/src.
-
-## Build
-
 ```shell
-cd {YOUR_WS}/src
+mkdir -p ~/{YOUR_WS}/src
+cd ~/{YOUR_WS}/src
 git clone https://github.com/agilexrobotics/data_tools.git
 cd data_tools && git checkout ros2
 git clone https://github.com/agilexrobotics/data_msgs.git
 cd data_msgs && git checkout ros2
-cd {YOUR_WS}
+cd ~/{YOUR_WS}
 colcon build --packages-select data_msgs
-source 
+source ~/{YOUR_WS}/install/setup.bash
 colcon build
+cd ~/{YOUR_WS}/src/data_tools
+conda create -n data python==3.10
+pip install -r requirements.txt
 ```
-## Run
 
-Run mcap to ario(if your data is mcap).
+## MCAP to ARIO(If your data is MCAP)
 
 ```bash
 source ~/{YOUR_WS}/install/setup.sh
+cd ~/{YOUR_WS}/
+sudo cp mcap /usr/bin/
 cd ~/{YOUR_WS}/src/data_tools/scripts/
-python3 mcap_to_aloha_data.py --datasetDir {your_dataset_dir} --alohaYaml {your_ws_dir}/src/data_tools/config/aloha_data_params.yaml
+python3 mcap_to_aloha_data.py --datasetDir {your_dataset_dir} --alohaYaml ~/{YOUR_WS}/src/data_tools/config/aloha_data_params.yaml
 ```
 
-Run the data collection code.
+## Data collection
 
 ```bash
 source ~/{YOUR_WS}/install/setup.sh
@@ -99,9 +93,9 @@ shutting down processing monitor...
 done
 ```
 
-**Note: If there is no data in the topic, the terminal output will be stuck, you need to use Ctrl+C to exit.**
+**Note: The default frame rate is set to 20Hz. If the sensor data frequency is lower than 20Hz or there is no data for the topic, it may cause the program to exit early. The terminal will print the corresponding topic and frame rate. Please check if the sensor corresponding to the topic with abnormal frame rate is connected correctly. You can modify the hz parameter in ~/{YOUR_WS}/src/data_tools/launch/run_data_capture. launch. py to lower the frame rate detection threshold. Please recompile after modification.**
 
-## Directory structure translation
+### Directory structure translation
 
 For example, dataset number 0 collected:
 
@@ -160,26 +154,12 @@ episode0
 │           └── config.json
 ├── instructions.json
 └── robotBase
-    └── vel
+    └── odometry
 ```
 
 [Example data](https://huggingface.co/datasets/agilexrobotics/ARIO)
 
 ## Synchronize the datasets
-```shell
-source ~/{YOUR_WS}/install/setup.sh
-# aloha
-ros2 launch data_tools run_data_sync.launch.py type:=aloha datasetDir:={data_path}
-# single pika
-ros2 launch data_tools run_data_sync.launch.py type:=single_pika datasetDir:={data_path} 
-# double pika
-ros2 launch data_tools run_data_sync.launch.py type:=multi_pika datasetDir:={data_path}
-# single pika teleop
-ros2 launch data_tools run_data_sync.launch.py type:=single_pika_teleop datasetDir:={data_path}
-# double pika teleop
-ros2 launch data_tools run_data_sync.launch.py type:=multi_pika_teleop datasetDir:={data_path}
-```
-or
 ```shell
 source ~/{YOUR_WS}/install/setup.sh
 # aloha
@@ -196,7 +176,7 @@ python3 data_sync.py --type multi_pika_teleop --datasetDir {data_path}
 
 After execution, a `sync.txt` file will be generated in the path of each specific dataset. For example, the image data synchronization index file path: `{data_path}/episode0/camera/color/left/sync.txt`.
 
-## create point cloud(optional)
+## Create point cloud(optional)
 ```shell
 source ~/{YOUR_WS}/install/setup.sh
 # aloha
@@ -213,7 +193,7 @@ python3 camera_point_cloud_filter.py --type multi_pika_teleop --datasetDir {data
 
 ## Convert raw data to HDF5 format
 
-Run the following code to generate a data.hdf5 file in the path of the task0 task, which includes all datasets (episode0, episode1, ..., episodeX). This file contains the synchronized joint information and the synchronized index file of the image data.
+Run the following code to generate a hdf5 file in the path of the task0 task, which includes all datasets (episode0, episode1, ..., episodeX). This file contains the synchronized joint information and the synchronized index file of the image data.
 
 use point cloud
 ```shell
@@ -247,45 +227,30 @@ By default, color, depth, and pointcloud in HDF5 use file indexing, so the origi
 ```shell
 source ~/{YOUR_WS}/install/setup.sh
 # aloha
-python3 data_to_hdf5.py --type aloha --useCameraPointCloud "" --datasetDir {data_path} --useIndex "" --datasetTargetDir {hdf5_saving_path}
+python3 data_to_hdf5.py --type aloha --useCameraPointCloud "" --datasetDir {data_path} --useIndex "" --targetDir {hdf5_saving_path}
 # single pika
-python3 data_to_hdf5.py --type single_pika --useCameraPointCloud "" --datasetDir {data_path} --useIndex "" --datasetTargetDir {hdf5_saving_path}
+python3 data_to_hdf5.py --type single_pika --useCameraPointCloud "" --datasetDir {data_path} --useIndex "" --targetDir {hdf5_saving_path}
 # double pika
-python3 data_to_hdf5.py --type multi_pika --useCameraPointCloud "" --datasetDir {data_path} --useIndex "" --datasetTargetDir {hdf5_saving_path}
+python3 data_to_hdf5.py --type multi_pika --useCameraPointCloud "" --datasetDir {data_path} --useIndex "" --targetDir {hdf5_saving_path}
 # single pika teleop
-python3 data_to_hdf5.py --type single_pika_teleop --useCameraPointCloud "" --datasetDir {data_path} --useIndex "" --datasetTargetDir {hdf5_saving_path}
+python3 data_to_hdf5.py --type single_pika_teleop --useCameraPointCloud "" --datasetDir {data_path} --useIndex "" --targetDir {hdf5_saving_path}
 # double pika teleop
-python3 data_to_hdf5.py --type multi_pika_teleop --useCameraPointCloud "" --datasetDir {data_path} --useIndex "" --datasetTargetDir {hdf5_saving_path}
+python3 data_to_hdf5.py --type multi_pika_teleop --useCameraPointCloud "" --datasetDir {data_path} --useIndex "" --targetDir {hdf5_saving_path}
 ```
 {hdf5_saving_path} is the path where saving your hdf5.
-## How to publish data
-use original data
+## Publish Data
 ```shell
 source ~/{YOUR_WS}/install/setup.sh
 # aloha
-ros2 launch data_tools run_data_publish.launch.py type:=aloha datasetDir:={data_path} episodeIndex:=0
+python3 data_publish.py --type aloha --datasetDir {hdf5_path}
 # single pika
-ros2 launch data_tools run_data_publish.launch.py type:=single_pika datasetDir:={data_path} episodeIndex:=0
+python3 data_publish.py --type single_pika --datasetDir {hdf5_path}
 # double pika
-ros2 launch data_tools run_data_publish.launch.py type:=multi_pika datasetDir:={data_path} episodeIndex:=0
+python3 data_publish.py --type multi_pika --datasetDir {hdf5_path}
 # single pika teleop
-ros2 launch data_tools run_data_publish.launch.py type:=single_pika_teleop datasetDir:={data_path} episodeIndex:=0
+python3 data_publish.py --type single_pika_teleop --datasetDir {hdf5_path}
 # double pika teleop
-ros2 launch data_tools run_data_publish.launch.py type:=multi_pika_teleop datasetDir:={data_path} episodeIndex:=0
-```
-use hdf5 data
-```shell
-source ~/{YOUR_WS}/install/setup.sh
-# aloha
-python3 data_publish.py --type aloha --datasetDir {data_path} --episodeName episode0
-# single pika
-python3 data_publish.py --type single_pika --datasetDir {data_path} --episodeName episode0
-# double pika
-python3 data_publish.py --type multi_pika --datasetDir {data_path} --episodeName episode0
-# single pika teleop
-python3 data_publish.py --type single_pika_teleop --datasetDir {data_path} --episodeName episode0
-# double pika teleop
-python3 data_publish.py --type multi_pika_teleop --datasetDir {data_path} --episodeName episode0
+python3 data_publish.py --type multi_pika_teleop --datasetDir {hdf5_path}
 ```
 ## How to load data from an HDF5 file for training
 
@@ -293,6 +258,22 @@ Here's an example of loading files. The paths in the program need to be manually
 
 ```shell
 python3 load_data_example.py
+```
+
+## How to convert HDF5 to lerobot 2.1
+follow https://github.com/agilexrobotics/lerobot-agilex.git to install conda env lerobot. then
+```shell
+conda activate lerobot 
+# aloha
+python3 hdf5_to_lerobot.py --type aloha --datasetDir {hdf5_path} --targetDir {lerobot_saving_path}
+# single pika
+python3 hdf5_to_lerobot.py --type single_pika --datasetDir {hdf5_path} --targetDir {lerobot_saving_path}
+# double pika
+python3 hdf5_to_lerobot.py --type multi_pika --datasetDir {hdf5_path} --targetDir {lerobot_saving_path}
+# single pika teleop
+python3 hdf5_to_lerobot.py --type single_pika_teleop --datasetDir {hdf5_path} --targetDir {lerobot_saving_path}
+# double pika teleop
+python3 hdf5_to_lerobot.py --type multi_pika_teleop --datasetDir {hdf5_path} --targetDir {lerobot_saving_path}
 ```
 
 ## How to add sensors tailored to your needs
@@ -339,7 +320,10 @@ sensors type:
 - gripper/encoder: `data_msgs::Gripper`
 - imu/9axis: `sensor_msgs::Imu`
 - lidar/pointCloud: `sensor_msgs::PointCloud2`
-- robotBase/vel: `nav_msgs::Odometry`
+- robotBase/odometry: `nav_msgs::Odometry`
+- robotBase/Velocity: `geometry_msgs::TwistStamped`
+- force/6dim: `geometry_msgs::WrenchStamped`
+- array/float32: `data_msgs::Array`
 
 ## Licence
 

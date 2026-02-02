@@ -16,7 +16,7 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Header
 from sensor_msgs.msg import JointState
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, TwistStamped
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import PoseStamped
 from sensor_msgs.msg import PointCloud2, PointField, Imu
@@ -24,6 +24,8 @@ from data_msgs.msg import Gripper
 from nav_msgs.msg import Odometry
 from cv_bridge import CvBridge, CvBridgeError
 from tf_transformations import quaternion_from_euler, euler_from_quaternion
+from geometry_msgs.msg import WrenchStamped
+from data_msgs.msg import Array
 import pcl
 import threading
 # import ros2_numpy
@@ -46,10 +48,13 @@ class RosOperator(Node):
         self.arm_joint_state_publishers = []
         self.arm_end_pose_publishers = []
         self.localization_pose_publishers = []
+        self.force_6dim_publishers = []
         self.gripper_encoder_publishers = []
         self.imu_9axis_publishers = []
+        self.array_float32_publishers = []
         self.lidar_point_cloud_publishers = []
-        self.robot_base_vel_publishers = []
+        self.robot_base_odometry_publishers = []
+        self.robot_base_velocity_publishers = []
         self.lift_motor_publishers = []
         self.init_ros()
         self.thread = threading.Thread(target=self.process_data)
@@ -63,10 +68,13 @@ class RosOperator(Node):
         self.arm_joint_state_publishers = [self.create_publisher(JointState, topic, 10) for topic in self.args.arm_joint_state_topics]
         self.arm_end_pose_publishers = [self.create_publisher(PoseStamped, topic, 10) for topic in self.args.arm_end_pose_topics]
         self.localization_pose_publishers = [self.create_publisher(PoseStamped, topic, 10) for topic in self.args.localization_pose_topics]
+        self.force_6dim_publishers = [self.create_publisher(WrenchStamped, topic, 10) for topic in self.args.force_6dim_topics]
         self.gripper_encoder_publishers = [self.create_publisher(Gripper, topic, 10) for topic in self.args.gripper_encoder_topics]
         self.imu_9axis_publishers = [self.create_publisher(Imu, topic, 10) for topic in self.args.imu_9axis_topics]
+        self.array_float32_publishers = [self.create_publisher(Array, topic, 10) for topic in self.args.array_float32_topics]
         self.lidar_point_cloud_publishers = [self.create_publisher(PointCloud2, topic, 10) for topic in self.args.lidar_point_cloud_topics]
-        self.robot_base_vel_publishers = [self.create_publisher(Twist, topic, 10) for topic in self.args.robot_base_vel_topics]
+        self.robot_base_odometry_publishers = [self.create_publisher(Odometry, topic, 10) for topic in self.args.robot_base_odometry_topics]
+        self.robot_base_velocity_publishers = [self.create_publisher(TwistStamped, topic, 10) for topic in self.args.robot_base_velocity_topics]
         if USELIFT:
             self.lift_motor_publishers = [self.create_publisher(LiftMotorMsg, topic, 10) for topic in self.args.lift_motor_topics]
     
@@ -117,7 +125,7 @@ class RosOperator(Node):
             end_pose_msg.pose.orientation.x = end_pose[3]
             end_pose_msg.pose.orientation.y = end_pose[4]
             end_pose_msg.pose.orientation.z = end_pose[5]
-            end_pose_msg.pose.orientation.w = end_pose[6] if len(end_pose) > 6
+            end_pose_msg.pose.orientation.w = end_pose[6] if len(end_pose) > 6 else 0
         self.arm_end_pose_publishers[index].publish(end_pose_msg)
 
     def publish_localization_pose(self, index, pose):
@@ -134,6 +142,19 @@ class RosOperator(Node):
         pose_msg.pose.orientation.z = q[2]
         pose_msg.pose.orientation.w = q[3]
         self.localization_pose_publishers[index].publish(pose_msg)
+    
+    def publish_force_6dim(self, index, force):
+        force_msg = WrenchStamped()
+        force_msg.header = Header()
+        force_msg.header.frame_id = "map"
+        force_msg.header.stamp = self.get_clock().now().to_msg()
+        force_msg.wrench.force.x = force[0]
+        force_msg.wrench.force.y = force[1]
+        force_msg.wrench.force.z = force[2]
+        force_msg.wrench.torque.x = force[3]
+        force_msg.wrench.torque.y = force[4]
+        force_msg.wrench.torque.z = force[5]
+        self.force_6dim_publishers[index].publish(force_msg)
 
     def publish_gripper_encoder(self, index, encoder_angle, encoder_distance):
         gripper_msg = Gripper()
@@ -161,18 +182,51 @@ class RosOperator(Node):
         imu_msg.linear_acceleration.z = linear_acceleration[2]
         self.imu_9axis_publishers[index].publish(imu_msg)
 
+    def publish_array_float32(self, index, dim_description, shape, data):
+        array_msg = Array()
+        array_msg.header = Header()
+        array_msg.header.frame_id = "map"
+        array_msg.header.stamp = self.get_clock().now().to_msg()
+        array_msg.dim_description = [d.decode('utf-8') for d in dim_description]
+        array_msg.shape = [int(s) for s in shape]
+        array_msg.data = [float(d) for d in data]
+        self.array_float32_publishers[index].publish(array_msg)
+
     def publish_lidar_point_cloud(self, index, point_cloud):
         self.lidar_point_cloud_publishers[index].publish(self.pcd_to_msg(point_cloud))
 
-    def publish_robot_base_vel(self, index, vel):
-        vel_msg = Twist()
-        vel_msg.linear.x = vel[0]
-        vel_msg.linear.y = vel[1]
-        vel_msg.linear.z = 0
-        vel_msg.angular.x = 0
-        vel_msg.angular.y = 0
-        vel_msg.angular.z = vel[2]
-        self.robot_base_vel_publishers[index].publish(vel_msg)
+    def publish_robot_base_odometry(self, index, pose, vel):
+        vel_msg = Odometry()
+        vel_msg.header = Header()
+        vel_msg.header.frame_id = "map"
+        vel_msg.header.stamp = self.get_clock().now().to_msg()
+        vel_msg.pose.pose.position.x = pose[0]
+        vel_msg.pose.pose.position.y = pose[1]
+        vel_msg.pose.pose.position.z = pose[2]
+        vel_msg.pose.pose.orientation.x = pose[3]
+        vel_msg.pose.pose.orientation.y = pose[4]
+        vel_msg.pose.pose.orientation.z = pose[5]
+        vel_msg.pose.pose.orientation.w = pose[6]
+        vel_msg.twist.twist.linear.x = vel[0]
+        vel_msg.twist.twist.linear.y = vel[1]
+        vel_msg.twist.twist.linear.z = vel[2]
+        vel_msg.twist.twist.angular.x = vel[3]
+        vel_msg.twist.twist.angular.y = vel[4]
+        vel_msg.twist.twist.angular.z = vel[5]
+        self.robot_base_odometry_publishers[index].publish(vel_msg)
+    
+    def publish_robot_base_velocity(self, index, vel):
+        vel_msg = TwistStamped()
+        vel_msg.header = Header()
+        vel_msg.header.frame_id = "map"
+        vel_msg.header.stamp = self.get_clock().now().to_msg()
+        vel_msg.twist.linear.x = vel[0]
+        vel_msg.twist.linear.y = vel[1]
+        vel_msg.twist.linear.z = vel[2]
+        vel_msg.twist.angular.x = vel[3]
+        vel_msg.twist.angular.y = vel[4]
+        vel_msg.twist.angular.z = vel[5]
+        self.robot_base_velocity_publishers[index].publish(vel_msg)
 
     def publish_lift_motor(self, index, val):
         if USELIFT:
@@ -260,10 +314,14 @@ class RosOperator(Node):
                         self.publish_arm_end_pose(j, root[f'/arm/endPose/{self.args.arm_end_pose_names[j]}'][i])
                     for j in range(len(self.args.localization_pose_names)):
                         self.publish_localization_pose(j, root[f'/localization/pose/{self.args.localization_pose_names[j]}'][i])
+                    for j in range(len(self.args.force_6dim_names)):
+                        self.publish_force_6dim(j, root[f'/force/6dim/{self.args.force_6dim_names[j]}'][i])
                     for j in range(len(self.args.gripper_encoder_names)):
                         self.publish_gripper_encoder(j, root[f'/gripper/encoderAngle/{self.args.gripper_encoder_names[j]}'][i], root[f'/gripper/encoderDistance/{self.args.gripper_encoder_names[j]}'][i])
                     for j in range(len(self.args.imu_9axis_names)):
                         self.publish_imu_9axis(j, root[f'/imu/9axisOrientation/{self.args.imu_9axis_names[j]}'][i], root[f'/imu/9axisAngularVelocity/{self.args.imu_9axis_names[j]}'][i], root[f'/imu/9axisLinearAcceleration/{self.args.imu_9axis_names[j]}'][i])
+                    for j in range(len(self.args.array_float32_names)):
+                        self.publish_array_float32(j, root[f'/array/float32DimDescription/{self.args.array_float32_names[j]}'][i], root[f'/array/float32Shape/{self.args.array_float32_names[j]}'][i], root[f'/array/float32Data/{self.args.array_float32_names[j]}'][i].reshape(-1))
                     for j in range(len(self.args.lidar_point_cloud_names)):
                         if f'/lidar/pointCloud/{self.args.lidar_point_cloud_names[j]}' in root.keys():
                             if root[f'/lidar/pointCloud/{self.args.lidar_point_cloud_names[j]}'].ndim == 1 and root[f'/lidar/pointCloud/{self.args.lidar_point_cloud_names[j]}'][i].decode('utf-8')[-3:] == 'pcd':
@@ -282,8 +340,10 @@ class RosOperator(Node):
                                     x, y, z = point[:3]
                                     packed_points.append([x, y, z])
                                 self.publish_lidar_point_cloud(j, packed_points)
-                    for j in range(len(self.args.robot_base_vel_names)):
-                        self.publish_robot_base_vel(j, root[f'/robotBase/vel/{self.args.robot_base_vel_names[j]}'][i])
+                    for j in range(len(self.args.robot_base_odometry_names)):
+                        self.publish_robot_base_odometry(j, root[f'/robotBase/odometry/{self.args.robot_base_odometry_names[j]}'][i])
+                    for j in range(len(self.args.robot_base_velocity_names)):
+                        self.publish_robot_base_velocity(j, root[f'/robotBase/velocity/{self.args.robot_base_velocity_names[j]}'][i])
                     for j in range(len(self.args.lift_motor_names)):
                         self.ros_operator.publish_lift_motor(j, root[f'/lift/motor/{self.args.lift_motor_names[j]}'][i])
                     print("frame:", i)
@@ -335,10 +395,14 @@ class RosOperator(Node):
                         self.publish_arm_end_pose(j, root[f'/arm/endPose/{self.args.arm_end_pose_names[j]}'][i])
                     for j in range(len(self.args.localization_pose_names)):
                         self.publish_localization_pose(j, root[f'/localization/pose/{self.args.localization_pose_names[j]}'][i])
+                    for j in range(len(self.args.force_6dim_names)):
+                        self.publish_force_6dim(j, root[f'/force/6dim/{self.args.force_6dim_names[j]}'][i])
                     for j in range(len(self.args.gripper_encoder_names)):
                         self.publish_gripper_encoder(j, root[f'/gripper/encoderAngle/{self.args.gripper_encoder_names[j]}'][i], root[f'/gripper/encoderDistance/{self.args.gripper_encoder_names[j]}'][i])
                     for j in range(len(self.args.imu_9axis_names)):
                         self.publish_imu_9axis(j, root[f'/imu/9axisOrientation/{self.args.imu_9axis_names[j]}'][i], root[f'/imu/9axisAngularVelocity/{self.args.imu_9axis_names[j]}'][i], root[f'/imu/9axisLinearAcceleration/{self.args.imu_9axis_names[j]}'][i])
+                    for j in range(len(self.args.array_float32_names)):
+                        self.publish_array_float32(j, root[f'/array/float32DimDescription/{self.args.array_float32_names[j]}'][i], root[f'/array/float32Shape/{self.args.array_float32_names[j]}'][i], root[f'/array/float32Data/{self.args.array_float32_names[j]}'][i])
                     for j in range(len(self.args.lidar_point_cloud_names)):
                         if f'/lidar/pointCloud/{self.args.lidar_point_cloud_names[j]}' in root.keys():
                             if root[f'/lidar/pointCloud/{self.args.lidar_point_cloud_names[j]}'].ndim == 1 and root[f'/lidar/pointCloud/{self.args.lidar_point_cloud_names[j]}'][i].decode('utf-8')[-3:] == 'pcd':
@@ -357,8 +421,10 @@ class RosOperator(Node):
                                     x, y, z = point[:3]
                                     packed_points.append([x, y, z])
                                 self.publish_lidar_point_cloud(j, packed_points)
-                    for j in range(len(self.args.robot_base_vel_names)):
-                        self.publish_robot_base_vel(j, root[f'/robotBase/vel/{self.args.robot_base_vel_names[j]}'][i])
+                    for j in range(len(self.args.robot_base_odometry_names)):
+                        self.publish_robot_base_odometry(j, root[f'/robotBase/odometryPose/{self.args.robot_base_odometry_names[j]}'][i], root[f'/robotBase/odometryVelocity/{self.args.robot_base_odometry_names[j]}'][i])
+                    for j in range(len(self.args.robot_base_velocity_names)):
+                        self.publish_robot_base_velocity(j, root[f'/robotBase/velocity/{self.args.robot_base_velocity_names[j]}'][i])
                     for j in range(len(self.args.lift_motor_names)):
                         self.ros_operator.publish_lift_motor(j, root[f'/lift/motor/{self.args.lift_motor_names[j]}'][i])
                     print("frame:", i)
@@ -413,6 +479,12 @@ def get_arguments():
     parser.add_argument('--localization_pose_topics', action='store', type=str, help='localization_pose_topics',
                         default=[],
                         required=False)
+    parser.add_argument('--force_6dim_names', action='store', type=str, help='force_6dim_names',
+                        default=[],
+                        required=False)
+    parser.add_argument('--force_6dim_topics', action='store', type=str, help='force_6dim_topics',
+                        default=[],
+                        required=False)
     parser.add_argument('--gripper_encoder_names', action='store', type=str, help='gripper_encoder_names',
                         default=[],
                         required=False)
@@ -425,16 +497,28 @@ def get_arguments():
     parser.add_argument('--imu_9axis_topics', action='store', type=str, help='imu_9axis_topics',
                         default=[],
                         required=False)
+    parser.add_argument('--array_float32_names', action='store', type=str, help='array_float32_names',
+                        default=[],
+                        required=False)
+    parser.add_argument('--array_float32_topics', action='store', type=str, help='array_float32_topics',
+                        default=[],
+                        required=False)
     parser.add_argument('--lidar_point_cloud_names', action='store', type=str, help='lidar_point_cloud_names',
                         default=[],
                         required=False)
     parser.add_argument('--lidar_point_cloud_topics', action='store', type=str, help='lidar_point_cloud_topics',
                         default=[],
                         required=False)
-    parser.add_argument('--robot_base_vel_names', action='store', type=str, help='robot_base_vel_names',
+    parser.add_argument('--robot_base_odometry_names', action='store', type=str, help='robot_base_odometry_names',
                         default=[],
                         required=False)
-    parser.add_argument('--robot_base_vel_topics', action='store', type=str, help='robot_base_vel_topics',
+    parser.add_argument('--robot_base_odometry_topics', action='store', type=str, help='robot_base_odometry_topics',
+                        default=[],
+                        required=False)
+    parser.add_argument('--robot_base_velocity_names', action='store', type=str, help='robot_base_velocity_names',
+                        default=[],
+                        required=False)
+    parser.add_argument('--robot_base_velocity_topics', action='store', type=str, help='robot_base_velocity_topics',
                         default=[],
                         required=False)
     parser.add_argument('--lift_motor_names', action='store', type=str, help='lift_motor_names',
@@ -462,14 +546,20 @@ def get_arguments():
         args.arm_end_pose_orients = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('arm', {}).get('endPose', {}).get('orients', [])
         args.localization_pose_names = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('localization', {}).get('pose', {}).get('names', [])
         args.localization_pose_topics = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('localization', {}).get('pose', {}).get('topics', [])
+        args.force_6dim_names = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('force', {}).get('6dim', {}).get('names', [])
+        args.force_6dim_topics = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('force', {}).get('6dim', {}).get('topics', [])
         args.gripper_encoder_names = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('gripper', {}).get('encoder', {}).get('names', [])
         args.gripper_encoder_topics = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('gripper', {}).get('encoder', {}).get('topics', [])
         args.imu_9axis_names = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('imu', {}).get('9axis', {}).get('names', [])
         args.imu_9axis_topics = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('imu', {}).get('9axis', {}).get('topics', [])
+        args.array_float32_names = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('array', {}).get('float32', {}).get('names', [])
+        args.array_float32_topics = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('array', {}).get('float32', {}).get('topics', [])
         args.lidar_point_cloud_names = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('lidar', {}).get('pointCloud', {}).get('names', [])
         args.lidar_point_cloud_topics = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('lidar', {}).get('pointCloud', {}).get('topics', [])
-        args.robot_base_vel_names = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('robotBase', {}).get('vel', {}).get('names', [])
-        args.robot_base_vel_topics = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('robotBase', {}).get('vel', {}).get('topics', [])
+        args.robot_base_odometry_names = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('robotBase', {}).get('odometry', {}).get('names', [])
+        args.robot_base_odometry_topics = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('robotBase', {}).get('odometry', {}).get('topics', [])
+        args.robot_base_velocity_names = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('robotBase', {}).get('velocity', {}).get('names', [])
+        args.robot_base_velocity_topics = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('robotBase', {}).get('velocity', {}).get('topics', [])
         args.lift_motor_names = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('lift', {}).get('motor', {}).get('names', [])
         args.lift_motor_topics = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('lift', {}).get('motor', {}).get('topics', [])
 

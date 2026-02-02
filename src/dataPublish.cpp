@@ -36,10 +36,13 @@ public:
     std::vector<rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr> pubArmJointStates;
     std::vector<rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr> pubArmEndPoses;
     std::vector<rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr> pubLocalizationPoses;
+    std::vector<rclcpp::Publisher<geometry_msgs::msg::WrenchStamped>::SharedPtr> pubForce6dims;
     std::vector<rclcpp::Publisher<data_msgs::msg::Gripper>::SharedPtr> pubGripperEncoders;
     std::vector<rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr> pubImu9Axiss;
+    std::vector<rclcpp::Publisher<data_msgs::msg::Array>::SharedPtr> pubArrayFloat32s;
     std::vector<rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr> pubLidarPointClouds;
-    std::vector<rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr> pubRobotBaseVels;
+    std::vector<rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr> pubRobotBaseOdometrys;
+    std::vector<rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr> pubRobotBaseVelocities;
     #ifdef _USELIFT
     std::vector<rclcpp::Publisher<bt_task_msgs::msg::LiftMotorMsg>::SharedPtr> pubLiftMotors;
     #endif
@@ -53,7 +56,8 @@ public:
     // std::vector<rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr> pubGripperEncoderConfigs;
     // std::vector<rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr> pubImu9AxisConfigs;
     // std::vector<rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr> pubLidarPointCloudConfigs;
-    // std::vector<rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr> pubRobotBaseVelConfigs;
+    // std::vector<rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr> pubRobotBaseOdometryConfigs;
+    // std::vector<rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr> pubRobotBaseVelocityConfigs;
 
     std::vector<sem_t> cameraColorSems;
     std::vector<sem_t> cameraDepthSems;
@@ -61,10 +65,13 @@ public:
     std::vector<sem_t> armJointStateSems;
     std::vector<sem_t> armEndPoseSems;
     std::vector<sem_t> localizationPoseSems;
+    std::vector<sem_t> force6dimSems;
     std::vector<sem_t> gripperEncoderSems;
     std::vector<sem_t> imu9AxisSems;
+    std::vector<sem_t> arrayFloat32Sems;
     std::vector<sem_t> lidarPointCloudSems;
-    std::vector<sem_t> robotBaseVelSems;
+    std::vector<sem_t> robotBaseOdometrySems;
+    std::vector<sem_t> robotBaseVelocitySems;
     std::vector<sem_t> liftMotorSems;
     std::vector<sem_t> tfTransformSems;
 
@@ -74,10 +81,13 @@ public:
     std::vector<std::ifstream> syncFileArmJointStates;
     std::vector<std::ifstream> syncFileArmEndPoses;
     std::vector<std::ifstream> syncFileLocalizationPoses;
+    std::vector<std::ifstream> syncFileForce6dims;
     std::vector<std::ifstream> syncFileGripperEncoders;
     std::vector<std::ifstream> syncFileImu9Axiss;
+    std::vector<std::ifstream> syncFileArrayFloat32s;
     std::vector<std::ifstream> syncFileLidarPointClouds;
-    std::vector<std::ifstream> syncFileRobotBaseVels;
+    std::vector<std::ifstream> syncFileRobotBaseOdometrys;
+    std::vector<std::ifstream> syncFileRobotBaseVelocitys;
     std::vector<std::ifstream> syncFileLiftMotors;
 
     std::vector<std::thread*> cameraColorPublishingThreads;
@@ -86,10 +96,13 @@ public:
     std::vector<std::thread*> armJointStatePublishingThreads;
     std::vector<std::thread*> armEndPosePublishingThreads;
     std::vector<std::thread*> localizationPosePublishingThreads;
+    std::vector<std::thread*> force6dimPublishingThreads;
     std::vector<std::thread*> gripperEncoderPublishingThreads;
     std::vector<std::thread*> imu9AxisPublishingThreads;
+    std::vector<std::thread*> arrayFloat32PublishingThreads;
     std::vector<std::thread*> lidarPointCloudPublishingThreads;
-    std::vector<std::thread*> robotBaseVelPublishingThreads;
+    std::vector<std::thread*> robotBaseOdometryPublishingThreads;
+    std::vector<std::thread*> robotBaseVelocityPublishingThreads;
     std::vector<std::thread*> liftMotorPublishingThreads;
     std::vector<std::thread*> tfTransformPublishingThreads;
 
@@ -110,10 +123,13 @@ public:
         syncFileArmJointStates = std::vector<std::ifstream>(armJointStateNames.size());
         syncFileArmEndPoses = std::vector<std::ifstream>(armEndPoseNames.size());
         syncFileLocalizationPoses = std::vector<std::ifstream>(localizationPoseNames.size());
+        syncFileForce6dims = std::vector<std::ifstream>(force6dimNames.size());
         syncFileGripperEncoders = std::vector<std::ifstream>(gripperEncoderNames.size());
         syncFileImu9Axiss = std::vector<std::ifstream>(imu9AxisNames.size());
+        syncFileArrayFloat32s = std::vector<std::ifstream>(arrayFloat32Names.size());
         syncFileLidarPointClouds = std::vector<std::ifstream>(lidarPointCloudNames.size());
-        syncFileRobotBaseVels = std::vector<std::ifstream>(robotBaseVelNames.size());
+        syncFileRobotBaseOdometrys = std::vector<std::ifstream>(robotBaseOdometryNames.size());
+        syncFileRobotBaseVelocitys = std::vector<std::ifstream>(robotBaseVelocityNames.size());
         syncFileLiftMotors = std::vector<std::ifstream>(liftMotorNames.size());
 
         cameraColorSems = std::vector<sem_t>(cameraColorNames.size());
@@ -122,10 +138,13 @@ public:
         armJointStateSems = std::vector<sem_t>(armJointStateNames.size());
         armEndPoseSems = std::vector<sem_t>(armEndPoseNames.size());
         localizationPoseSems = std::vector<sem_t>(localizationPoseNames.size());
+        force6dimSems = std::vector<sem_t>(force6dimNames.size());
         gripperEncoderSems = std::vector<sem_t>(gripperEncoderNames.size());
         imu9AxisSems = std::vector<sem_t>(imu9AxisNames.size());
+        arrayFloat32Sems = std::vector<sem_t>(arrayFloat32Names.size());
         lidarPointCloudSems = std::vector<sem_t>(lidarPointCloudNames.size());
-        robotBaseVelSems = std::vector<sem_t>(robotBaseVelNames.size());
+        robotBaseOdometrySems = std::vector<sem_t>(robotBaseOdometryNames.size());
+        robotBaseVelocitySems = std::vector<sem_t>(robotBaseVelocityNames.size());
         liftMotorSems = std::vector<sem_t>(liftMotorNames.size());
         tfTransformSems = std::vector<sem_t>(tfTransformParentFrames.size());
 
@@ -179,6 +198,13 @@ public:
                 sem_init(&localizationPoseSems.at(i), 0, 0);
             }
         }
+        for(int i = 0; i < force6dimNames.size(); i++){
+            pubForce6dims.push_back(create_publisher<geometry_msgs::msg::WrenchStamped>(force6dimPublishTopics[i], 2000));
+            if(force6dimToPublishs.at(i)){
+                syncFileForce6dims.at(i).open(force6dimDirs.at(i)+"/sync.txt");
+                sem_init(&force6dimSems.at(i), 0, 0);
+            }
+        }
         for(int i = 0; i < gripperEncoderNames.size(); i++){
             pubGripperEncoders.push_back(create_publisher<data_msgs::msg::Gripper>(gripperEncoderPublishTopics[i], 2000));
             if(gripperEncoderToPublishs.at(i)){
@@ -193,6 +219,13 @@ public:
                 sem_init(&imu9AxisSems.at(i), 0, 0);
             }
         }
+        for(int i = 0; i < arrayFloat32Names.size(); i++){
+            pubArrayFloat32s.push_back(create_publisher<data_msgs::msg::Array>(arrayFloat32PublishTopics[i], 2000));
+            if(arrayFloat32ToPublishs.at(i)){
+                syncFileArrayFloat32s.at(i).open(arrayFloat32Dirs.at(i)+"/sync.txt");
+                sem_init(&arrayFloat32Sems.at(i), 0, 0);
+            }
+        }
         for(int i = 0; i < lidarPointCloudNames.size(); i++){
             pubLidarPointClouds.push_back(create_publisher<sensor_msgs::msg::PointCloud2>(lidarPointCloudPublishTopics[i], 2000));
             if(lidarPointCloudToPublishs.at(i)){
@@ -200,11 +233,18 @@ public:
                 sem_init(&lidarPointCloudSems.at(i), 0, 0);
             }
         }
-        for(int i = 0; i < robotBaseVelNames.size(); i++){
-            pubRobotBaseVels.push_back(create_publisher<nav_msgs::msg::Odometry>(robotBaseVelPublishTopics[i], 2000));
-            if(robotBaseVelToPublishs.at(i)){
-                syncFileRobotBaseVels.at(i).open(robotBaseVelDirs.at(i)+"/sync.txt");
-                sem_init(&robotBaseVelSems.at(i), 0, 0);
+        for(int i = 0; i < robotBaseOdometryNames.size(); i++){
+            pubRobotBaseOdometrys.push_back(create_publisher<nav_msgs::msg::Odometry>(robotBaseOdometryPublishTopics[i], 2000));
+            if(robotBaseOdometryToPublishs.at(i)){
+                syncFileRobotBaseOdometrys.at(i).open(robotBaseOdometryDirs.at(i)+"/sync.txt");
+                sem_init(&robotBaseOdometrySems.at(i), 0, 0);
+            }
+        }
+        for(int i = 0; i < robotBaseVelocityNames.size(); i++){
+            pubRobotBaseVelocities.push_back(create_publisher<geometry_msgs::msg::TwistStamped>(robotBaseVelocityPublishTopics[i], 2000));
+            if(robotBaseVelocityToPublishs.at(i)){
+                syncFileRobotBaseVelocitys.at(i).open(robotBaseVelocityDirs.at(i)+"/sync.txt");
+                sem_init(&robotBaseVelocitySems.at(i), 0, 0);
             }
         }
         #ifdef _USELIFT
@@ -604,6 +644,42 @@ public:
         }
     }
 
+    void force6dimPublishing(const int index){
+        std::string time0 = "";
+        int count = 0;
+        while(rclcpp::ok()){
+            std::string time;
+            if(publishIndex != -1){
+                if(time0 == ""){
+                    getline(syncFileForce6dims.at(index), time0);
+                    if(count != publishIndex){
+                        count++;
+                        time0 = "";
+                        continue;
+                    }
+                }
+                time = time0;
+            }else{
+                if(!getline(syncFileForce6dims.at(index), time))
+                    break;
+            }
+            sem_wait(&force6dimSems.at(index));
+            geometry_msgs::msg::WrenchStamped msg;
+            msg.header.stamp = rclcpp::Clock().now();
+            Json::Reader jsonReader;
+            Json::Value root;
+            std::ifstream file(force6dimDirs.at(index) + "/" + time, std::iostream::binary);
+            jsonReader.parse(file, root);
+            msg.wrench.force.x = root["force"]["x"].asDouble();
+            msg.wrench.force.y = root["force"]["y"].asDouble();
+            msg.wrench.force.z = root["force"]["z"].asDouble();
+            msg.wrench.torque.x = root["torque"]["x"].asDouble();
+            msg.wrench.torque.y = root["torque"]["y"].asDouble();
+            msg.wrench.torque.z = root["torque"]["z"].asDouble();
+            pubForce6dims.at(index)->publish(msg);
+        }
+    }
+
     void gripperEncoderPublishing(const int index){
         std::string time0 = "";
         int count = 0;
@@ -676,6 +752,144 @@ public:
         }
     }
 
+    void arrayFloat32Publishing(const int index){
+        std::string time0 = "";
+        int count = 0;
+        while(rclcpp::ok()){
+            std::string time;
+            if(publishIndex != -1){
+                if(time0 == ""){
+                    getline(syncFileArrayFloat32s.at(index), time0);
+                    if(count != publishIndex){
+                        count++;
+                        time0 = "";
+                        continue;
+                    }
+                }
+                time = time0;
+            }else{
+                if(!getline(syncFileArrayFloat32s.at(index), time))
+                    break;
+            }
+            sem_wait(&arrayFloat32Sems.at(index));
+            data_msgs::msg::Array msg;
+            msg.header.stamp = rclcpp::Clock().now();
+            
+            std::string basePath = arrayFloat32Dirs.at(index) + "/" + time;
+            size_t dotPos = basePath.find_last_of('.');
+            std::string pathWithoutExt = (dotPos != std::string::npos) ? basePath.substr(0, dotPos) : basePath;
+            std::string npyPath = pathWithoutExt + ".npy";
+            std::ifstream file(npyPath, std::ios::binary);
+            
+            if (file.is_open()) {
+                // Read magic string
+                char magic[6];
+                file.read(magic, 6);
+                
+                // Read version
+                uint8_t versionMajor, versionMinor;
+                file.read(reinterpret_cast<char*>(&versionMajor), 1);
+                file.read(reinterpret_cast<char*>(&versionMinor), 1);
+                
+                // Read header length (2 bytes for v1.0, 4 bytes for v3.0)
+                uint32_t headerLen;
+                if (versionMajor == 1) {
+                    uint16_t headerLen16;
+                    file.read(reinterpret_cast<char*>(&headerLen16), 2);
+                    headerLen = headerLen16;
+                } else {
+                    file.read(reinterpret_cast<char*>(&headerLen), 4);
+                }
+                
+                // Read header
+                std::vector<char> headerBuf(headerLen);
+                file.read(headerBuf.data(), headerLen);
+                std::string headerStr(headerBuf.data(), headerLen);
+                
+                // Data starts immediately after header
+                
+                // Parse field lengths from header (support both single and double quotes)
+                auto extractLen = [&headerStr, &npyPath](const std::string& fieldName) -> size_t {
+                    // Try double quotes first (Python 3 standard)
+                    size_t fieldStart = headerStr.find("\"" + fieldName + "\"");
+                    if (fieldStart == std::string::npos) {
+                        // Fall back to single quotes (Python 2 / old format)
+                        fieldStart = headerStr.find("'" + fieldName + "'");
+                    }
+                    if (fieldStart == std::string::npos) {
+                        std::cerr << "ERROR: Field '" << fieldName << "' not found in NPY header" << std::endl;
+                        std::cerr << "Header: " << headerStr << std::endl;
+                        std::cerr << "File: " << npyPath << std::endl;
+                        throw std::runtime_error("Field '" + fieldName + "' not found in NPY header");
+                    }
+                    
+                    size_t parenPos = headerStr.find("(", fieldStart);
+                    if (parenPos == std::string::npos) {
+                        std::cerr << "ERROR: '(' not found after field '" << fieldName << "'" << std::endl;
+                        std::cerr << "Header: " << headerStr << std::endl;
+                        throw std::runtime_error("Invalid NPY header format");
+                    }
+                    
+                    size_t lenStart = parenPos + 1;
+                    size_t lenEnd = headerStr.find(",", lenStart);
+                    if (lenEnd == std::string::npos) {
+                        std::cerr << "ERROR: ',' not found after '(' for field '" << fieldName << "'" << std::endl;
+                        std::cerr << "Header: " << headerStr << std::endl;
+                        throw std::runtime_error("Invalid NPY header format");
+                    }
+                    
+                    std::string lenStr = headerStr.substr(lenStart, lenEnd - lenStart);
+                    // Trim whitespace
+                    lenStr.erase(0, lenStr.find_first_not_of(" \t\n\r"));
+                    lenStr.erase(lenStr.find_last_not_of(" \t\n\r") + 1);
+                    
+                    try {
+                        return std::stoul(lenStr);
+                    } catch (const std::exception& e) {
+                        std::cerr << "ERROR: Cannot convert '" << lenStr << "' to number for field '" << fieldName << "'" << std::endl;
+                        std::cerr << "Header: " << headerStr << std::endl;
+                        throw;
+                    }
+                };
+                
+                size_t shapeLen = extractLen("shape");
+                size_t dimDescLen = extractLen("dim_description");
+                size_t dataLen = extractLen("data");
+                
+                // Read shape field (uint32)
+                std::vector<uint32_t> shapeData(shapeLen);
+                file.read(reinterpret_cast<char*>(shapeData.data()), shapeLen * sizeof(uint32_t));
+                msg.shape.assign(shapeData.begin(), shapeData.end());
+                
+                // Read dim_description field (uint8)
+                std::vector<uint8_t> dimDescData(dimDescLen);
+                file.read(reinterpret_cast<char*>(dimDescData.data()), dimDescLen * sizeof(uint8_t));
+                
+                // Decode dim_description: [count, len0, str0..., len1, str1...]
+                msg.dim_description.clear();
+                size_t idx = 0;
+                uint8_t descCount = dimDescData[idx++];
+                for(uint8_t i = 0; i < descCount; ++i) {
+                    uint8_t strLen = dimDescData[idx++];
+                    std::string str;
+                    str.reserve(strLen);
+                    for(uint8_t j = 0; j < strLen; ++j) {
+                        str += static_cast<char>(dimDescData[idx++]);
+                    }
+                    msg.dim_description.push_back(str);
+                }
+                
+                // Read data field (float32)
+                msg.data.resize(dataLen);
+                file.read(reinterpret_cast<char*>(msg.data.data()), dataLen * sizeof(float));
+                
+                file.close();
+            }
+
+            pubArrayFloat32s.at(index)->publish(msg);
+        }
+    }
+
     void lidarPointCloudPublishing(const int index){
         std::string time0 = "";
         int count = 0;
@@ -708,14 +922,14 @@ public:
         }
     }
 
-    void robotBaseVelPublishing(const int index){
+    void robotBaseOdometryPublishing(const int index){
         std::string time0 = "";
         int count = 0;
         while(rclcpp::ok()){
             std::string time;
             if(publishIndex != -1){
                 if(time0 == ""){
-                    getline(syncFileRobotBaseVels.at(index), time0);
+                    getline(syncFileRobotBaseOdometrys.at(index), time0);
                     if(count != publishIndex){
                         count++;
                         time0 = "";
@@ -724,20 +938,68 @@ public:
                 }
                 time = time0;
             }else{
-                if(!getline(syncFileRobotBaseVels.at(index), time))
+                if(!getline(syncFileRobotBaseOdometrys.at(index), time))
                     break;
             }
-            sem_wait(&robotBaseVelSems.at(index));
+            sem_wait(&robotBaseOdometrySems.at(index));
             nav_msgs::msg::Odometry msg;
             msg.header.stamp = rclcpp::Clock().now();
             Json::Reader jsonReader;
             Json::Value root;
-            std::ifstream file(robotBaseVelDirs.at(index) + "/" + time, std::iostream::binary);
+            std::ifstream file(robotBaseOdometryDirs.at(index) + "/" + time, std::iostream::binary);
             jsonReader.parse(file, root);
+            msg.header.frame_id = "map";
+            msg.child_frame_id = "base_link";
             msg.twist.twist.linear.x = root["linear"]["x"].asDouble();
             msg.twist.twist.linear.y = root["linear"]["y"].asDouble();
+            msg.twist.twist.linear.z = root["linear"]["z"].asDouble();
+            msg.twist.twist.angular.x = root["angular"]["x"].asDouble();
+            msg.twist.twist.angular.y = root["angular"]["y"].asDouble();
             msg.twist.twist.angular.z = root["angular"]["z"].asDouble();
-            pubRobotBaseVels.at(index)->publish(msg);
+            msg.pose.pose.position.x = root["position"]["x"].asDouble();
+            msg.pose.pose.position.y = root["position"]["y"].asDouble();
+            msg.pose.pose.position.z = root["position"]["z"].asDouble();
+            msg.pose.pose.orientation.x = root["orientation"]["x"].asDouble();
+            msg.pose.pose.orientation.y = root["orientation"]["y"].asDouble();
+            msg.pose.pose.orientation.z = root["orientation"]["z"].asDouble();
+            msg.pose.pose.orientation.w = root["orientation"]["w"].asDouble();
+            pubRobotBaseOdometrys.at(index)->publish(msg);
+        }
+    }
+
+    void robotBaseVelocityPublishing(const int index){
+        std::string time0 = "";
+        int count = 0;
+        while(rclcpp::ok()){
+            std::string time;
+            if(publishIndex != -1){
+                if(time0 == ""){
+                    getline(syncFileRobotBaseVelocitys.at(index), time0);
+                    if(count != publishIndex){
+                        count++;
+                        time0 = "";
+                        continue;
+                    }
+                }
+                time = time0;
+            }else{
+                if(!getline(syncFileRobotBaseVelocitys.at(index), time))
+                    break;
+            }
+            sem_wait(&robotBaseVelocitySems.at(index));
+            geometry_msgs::msg::TwistStamped msg;
+            msg.header.stamp = rclcpp::Clock().now();
+            Json::Reader jsonReader;
+            Json::Value root;
+            std::ifstream file(robotBaseVelocityDirs.at(index) + "/" + time, std::iostream::binary);
+            jsonReader.parse(file, root);
+            msg.twist.linear.x = root["linear"]["x"].asDouble();
+            msg.twist.linear.y = root["linear"]["y"].asDouble();
+            msg.twist.linear.z = root["linear"]["z"].asDouble();
+            msg.twist.angular.x = root["angular"]["x"].asDouble();
+            msg.twist.angular.y = root["angular"]["y"].asDouble();
+            msg.twist.angular.z = root["angular"]["z"].asDouble();
+            pubRobotBaseVelocities.at(index)->publish(msg);
         }
     }
 
@@ -830,6 +1092,10 @@ public:
                 if(localizationPoseToPublishs.at(i))
                     sem_post(&localizationPoseSems.at(i));
             }
+            for(int i = 0; i < force6dimNames.size(); i++){
+                if(force6dimToPublishs.at(i))
+                    sem_post(&force6dimSems.at(i));
+            }
             for(int i = 0; i < gripperEncoderNames.size(); i++){
                 if(gripperEncoderToPublishs.at(i))
                     sem_post(&gripperEncoderSems.at(i));
@@ -838,13 +1104,21 @@ public:
                 if(imu9AxisToPublishs.at(i))
                     sem_post(&imu9AxisSems.at(i));
             }
+            for(int i = 0; i < arrayFloat32Names.size(); i++){
+                if(arrayFloat32ToPublishs.at(i))
+                    sem_post(&arrayFloat32Sems.at(i));
+            }
             for(int i = 0; i < lidarPointCloudNames.size(); i++){
                 if(lidarPointCloudToPublishs.at(i))
                     sem_post(&lidarPointCloudSems.at(i));
             }
-            for(int i = 0; i < robotBaseVelNames.size(); i++){
-                if(robotBaseVelToPublishs.at(i))
-                    sem_post(&robotBaseVelSems.at(i));
+            for(int i = 0; i < robotBaseOdometryNames.size(); i++){
+                if(robotBaseOdometryToPublishs.at(i))
+                    sem_post(&robotBaseOdometrySems.at(i));
+            }
+            for(int i = 0; i < robotBaseVelocityNames.size(); i++){
+                if(robotBaseVelocityToPublishs.at(i))
+                    sem_post(&robotBaseVelocitySems.at(i));
             }
             for(int i = 0; i < liftMotorNames.size(); i++){
                 if(liftMotorToPublishs.at(i))
@@ -889,6 +1163,11 @@ public:
             delete localizationPosePublishingThreads.at(i);
             localizationPosePublishingThreads.at(i) = nullptr;
         }
+        for(int i = 0; i < force6dimPublishingThreads.size(); i++){
+            force6dimPublishingThreads.at(i)->join();
+            delete force6dimPublishingThreads.at(i);
+            force6dimPublishingThreads.at(i) = nullptr;
+        }
         for(int i = 0; i < gripperEncoderPublishingThreads.size(); i++){
             gripperEncoderPublishingThreads.at(i)->join();
             delete gripperEncoderPublishingThreads.at(i);
@@ -899,15 +1178,25 @@ public:
             delete imu9AxisPublishingThreads.at(i);
             imu9AxisPublishingThreads.at(i) = nullptr;
         }
+        for(int i = 0; i < arrayFloat32PublishingThreads.size(); i++){
+            arrayFloat32PublishingThreads.at(i)->join();
+            delete arrayFloat32PublishingThreads.at(i);
+            arrayFloat32PublishingThreads.at(i) = nullptr;
+        }
         for(int i = 0; i < lidarPointCloudPublishingThreads.size(); i++){
             lidarPointCloudPublishingThreads.at(i)->join();
             delete lidarPointCloudPublishingThreads.at(i);
             lidarPointCloudPublishingThreads.at(i) = nullptr;
         }
-        for(int i = 0; i < robotBaseVelPublishingThreads.size(); i++){
-            robotBaseVelPublishingThreads.at(i)->join();
-            delete robotBaseVelPublishingThreads.at(i);
-            robotBaseVelPublishingThreads.at(i) = nullptr;
+        for(int i = 0; i < robotBaseOdometryPublishingThreads.size(); i++){
+            robotBaseOdometryPublishingThreads.at(i)->join();
+            delete robotBaseOdometryPublishingThreads.at(i);
+            robotBaseOdometryPublishingThreads.at(i) = nullptr;
+        }
+        for(int i = 0; i < robotBaseVelocityPublishingThreads.size(); i++){
+            robotBaseVelocityPublishingThreads.at(i)->join();
+            delete robotBaseVelocityPublishingThreads.at(i);
+            robotBaseVelocityPublishingThreads.at(i) = nullptr;
         }
         for(int i = 0; i < liftMotorPublishingThreads.size(); i++){
             liftMotorPublishingThreads.at(i)->join();
@@ -948,6 +1237,10 @@ public:
             if(localizationPoseToPublishs.at(i))
                 localizationPosePublishingThreads.push_back(new std::thread(&DataPublish::localizationPosePublishing, this, i));
         }
+        for(int i = 0; i < force6dimNames.size(); i++){
+            if(force6dimToPublishs.at(i))
+                force6dimPublishingThreads.push_back(new std::thread(&DataPublish::force6dimPublishing, this, i));
+        }
         for(int i = 0; i < gripperEncoderNames.size(); i++){
             if(gripperEncoderToPublishs.at(i))
                 gripperEncoderPublishingThreads.push_back(new std::thread(&DataPublish::gripperEncoderPublishing, this, i));
@@ -956,13 +1249,21 @@ public:
             if(imu9AxisToPublishs.at(i))
                 imu9AxisPublishingThreads.push_back(new std::thread(&DataPublish::imu9AxisPublishing, this, i));
         }
+        for(int i = 0; i < arrayFloat32Names.size(); i++){
+            if(arrayFloat32ToPublishs.at(i))
+                arrayFloat32PublishingThreads.push_back(new std::thread(&DataPublish::arrayFloat32Publishing, this, i));
+        }
         for(int i = 0; i < lidarPointCloudNames.size(); i++){
             if(lidarPointCloudToPublishs.at(i))
                 lidarPointCloudPublishingThreads.push_back(new std::thread(&DataPublish::lidarPointCloudPublishing, this, i));
         }
-        for(int i = 0; i < robotBaseVelNames.size(); i++){
-            if(robotBaseVelToPublishs.at(i))
-                robotBaseVelPublishingThreads.push_back(new std::thread(&DataPublish::robotBaseVelPublishing, this, i));
+        for(int i = 0; i < robotBaseOdometryNames.size(); i++){
+            if(robotBaseOdometryToPublishs.at(i))
+                robotBaseOdometryPublishingThreads.push_back(new std::thread(&DataPublish::robotBaseOdometryPublishing, this, i));
+        }
+        for(int i = 0; i < robotBaseVelocityNames.size(); i++){
+            if(robotBaseVelocityToPublishs.at(i))
+                robotBaseVelocityPublishingThreads.push_back(new std::thread(&DataPublish::robotBaseVelocityPublishing, this, i));
         }
         for(int i = 0; i < liftMotorNames.size(); i++){
             if(liftMotorToPublishs.at(i))

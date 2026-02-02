@@ -40,6 +40,16 @@
       #     names: []
       #     topics: []
 
+      # force:
+      #   6dim:
+      #     names: []
+      #     topics: []
+
+      # array:
+      #   float32:
+      #     names: []
+      #     topics: []
+
       # imu:
       #   9axis:
       #     names: []
@@ -64,9 +74,12 @@
           pubTopics: ['/lifter_1/LiftMotorStatePub']
 
       robotBase:
-        vel:
+        odometry:
           names: ['chassis']
           topics: ['/ranger_base_node/odom']
+        # velocity:
+        #   names: []
+        #   topics: []
       
       # tf:
       #   transform:

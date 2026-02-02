@@ -48,10 +48,13 @@ public:
     std::vector<std::vector<TimeSeries>> armJointStateDataTimeSeries;
     std::vector<std::vector<TimeSeries>> armEndPoseDataTimeSeries;
     std::vector<std::vector<TimeSeries>> localizationPoseDataTimeSeries;
+    std::vector<std::vector<TimeSeries>> force6dimDataTimeSeries;
     std::vector<std::vector<TimeSeries>> gripperEncoderDataTimeSeries;
     std::vector<std::vector<TimeSeries>> imu9AxisDataTimeSeries;
+    std::vector<std::vector<TimeSeries>> arrayFloat32DataTimeSeries;
     std::vector<std::vector<TimeSeries>> lidarPointCloudDataTimeSeries;
-    std::vector<std::vector<TimeSeries>> robotBaseVelDataTimeSeries;
+    std::vector<std::vector<TimeSeries>> robotBaseOdometryDataTimeSeries;
+    std::vector<std::vector<TimeSeries>> robotBaseVelocityDataTimeSeries;
     std::vector<std::vector<TimeSeries>> liftMotorDataTimeSeries;
 
     std::vector<std::vector<TimeSeries>> cameraColorSyncTimeSeries;
@@ -60,10 +63,13 @@ public:
     std::vector<std::vector<TimeSeries>> armJointStateSyncTimeSeries;
     std::vector<std::vector<TimeSeries>> armEndPoseSyncTimeSeries;
     std::vector<std::vector<TimeSeries>> localizationPoseSyncTimeSeries;
+    std::vector<std::vector<TimeSeries>> force6dimSyncTimeSeries;
     std::vector<std::vector<TimeSeries>> gripperEncoderSyncTimeSeries;
     std::vector<std::vector<TimeSeries>> imu9AxisSyncTimeSeries;
+    std::vector<std::vector<TimeSeries>> arrayFloat32SyncTimeSeries;
     std::vector<std::vector<TimeSeries>> lidarPointCloudSyncTimeSeries;
-    std::vector<std::vector<TimeSeries>> robotBaseVelSyncTimeSeries;
+    std::vector<std::vector<TimeSeries>> robotBaseOdometrySyncTimeSeries;
+    std::vector<std::vector<TimeSeries>> robotBaseVelocitySyncTimeSeries;
     std::vector<std::vector<TimeSeries>> liftMotorSyncTimeSeries;
 
     std::vector<std::string> cameraColorExts;
@@ -72,10 +78,13 @@ public:
     std::vector<std::string> armJointStateExts;
     std::vector<std::string> armEndPoseExts;
     std::vector<std::string> localizationPoseExts;
+    std::vector<std::string> force6dimExts;
     std::vector<std::string> gripperEncoderExts;
     std::vector<std::string> imu9AxisExts;
+    std::vector<std::string> arrayFloat32Exts;
     std::vector<std::string> lidarPointCloudExts;
-    std::vector<std::string> robotBaseVelExts;
+    std::vector<std::string> robotBaseOdometryExts;
+    std::vector<std::string> robotBaseVelocityExts;
     std::vector<std::string> liftMotorExts;
 
     double timeDiffLimit;
@@ -88,10 +97,13 @@ public:
         armJointStateDataTimeSeries = std::vector<std::vector<TimeSeries>>(armJointStateNames.size());
         armEndPoseDataTimeSeries = std::vector<std::vector<TimeSeries>>(armEndPoseNames.size());
         localizationPoseDataTimeSeries = std::vector<std::vector<TimeSeries>>(localizationPoseNames.size());
+        force6dimDataTimeSeries = std::vector<std::vector<TimeSeries>>(force6dimNames.size());
         gripperEncoderDataTimeSeries = std::vector<std::vector<TimeSeries>>(gripperEncoderNames.size());
         imu9AxisDataTimeSeries = std::vector<std::vector<TimeSeries>>(imu9AxisNames.size());
+        arrayFloat32DataTimeSeries = std::vector<std::vector<TimeSeries>>(arrayFloat32Names.size());
         lidarPointCloudDataTimeSeries = std::vector<std::vector<TimeSeries>>(lidarPointCloudNames.size());
-        robotBaseVelDataTimeSeries = std::vector<std::vector<TimeSeries>>(robotBaseVelNames.size());
+        robotBaseOdometryDataTimeSeries = std::vector<std::vector<TimeSeries>>(robotBaseOdometryNames.size());
+        robotBaseVelocityDataTimeSeries = std::vector<std::vector<TimeSeries>>(robotBaseVelocityNames.size());
         liftMotorDataTimeSeries = std::vector<std::vector<TimeSeries>>(liftMotorNames.size());
 
         cameraColorSyncTimeSeries = std::vector<std::vector<TimeSeries>>(cameraColorNames.size());
@@ -100,10 +112,13 @@ public:
         armJointStateSyncTimeSeries = std::vector<std::vector<TimeSeries>>(armJointStateNames.size());
         armEndPoseSyncTimeSeries = std::vector<std::vector<TimeSeries>>(armEndPoseNames.size());
         localizationPoseSyncTimeSeries = std::vector<std::vector<TimeSeries>>(localizationPoseNames.size());
+        force6dimSyncTimeSeries = std::vector<std::vector<TimeSeries>>(force6dimNames.size());
         gripperEncoderSyncTimeSeries = std::vector<std::vector<TimeSeries>>(gripperEncoderNames.size());
         imu9AxisSyncTimeSeries = std::vector<std::vector<TimeSeries>>(imu9AxisNames.size());
+        arrayFloat32SyncTimeSeries = std::vector<std::vector<TimeSeries>>(arrayFloat32Names.size());
         lidarPointCloudSyncTimeSeries = std::vector<std::vector<TimeSeries>>(lidarPointCloudNames.size());
-        robotBaseVelSyncTimeSeries = std::vector<std::vector<TimeSeries>>(robotBaseVelNames.size());
+        robotBaseOdometrySyncTimeSeries = std::vector<std::vector<TimeSeries>>(robotBaseOdometryNames.size());
+        robotBaseVelocitySyncTimeSeries = std::vector<std::vector<TimeSeries>>(robotBaseVelocityNames.size());
         liftMotorSyncTimeSeries = std::vector<std::vector<TimeSeries>>(liftMotorNames.size());
 
         cameraColorExts = std::vector<std::string>(cameraColorNames.size());
@@ -112,10 +127,13 @@ public:
         armJointStateExts = std::vector<std::string>(armJointStateNames.size());
         armEndPoseExts = std::vector<std::string>(armEndPoseNames.size());
         localizationPoseExts = std::vector<std::string>(localizationPoseNames.size());
+        force6dimExts = std::vector<std::string>(force6dimNames.size());
         gripperEncoderExts = std::vector<std::string>(gripperEncoderNames.size());
         imu9AxisExts = std::vector<std::string>(imu9AxisNames.size());
+        arrayFloat32Exts = std::vector<std::string>(arrayFloat32Names.size());
         lidarPointCloudExts = std::vector<std::string>(lidarPointCloudNames.size());
-        robotBaseVelExts = std::vector<std::string>(robotBaseVelNames.size());
+        robotBaseOdometryExts = std::vector<std::string>(robotBaseOdometryNames.size());
+        robotBaseVelocityExts = std::vector<std::string>(robotBaseVelocityNames.size());
         liftMotorExts = std::vector<std::string>(liftMotorNames.size());
 
         for(int i = 0; i < cameraColorNames.size(); i++){
@@ -147,6 +165,10 @@ public:
             getFileInPath(localizationPoseDirs.at(i), ".json", &localizationPoseDataTimeSeries.at(i), &localizationPoseSyncTimeSeries.at(i));
             localizationPoseExts.at(i) = ".json";
         }
+        for(int i = 0; i < force6dimNames.size(); i++){
+            getFileInPath(force6dimDirs.at(i), ".json", &force6dimDataTimeSeries.at(i), &force6dimSyncTimeSeries.at(i));
+            force6dimExts.at(i) = ".json";
+        }
         for(int i = 0; i < gripperEncoderNames.size(); i++){
             getFileInPath(gripperEncoderDirs.at(i), ".json", &gripperEncoderDataTimeSeries.at(i), &gripperEncoderSyncTimeSeries.at(i));
             gripperEncoderExts.at(i) = ".json";
@@ -155,13 +177,21 @@ public:
             getFileInPath(imu9AxisDirs.at(i), ".json", &imu9AxisDataTimeSeries.at(i), &imu9AxisSyncTimeSeries.at(i));
             imu9AxisExts.at(i) = ".json";
         }
+        for(int i = 0; i < arrayFloat32Names.size(); i++){
+            getFileInPath(arrayFloat32Dirs.at(i), ".npy", &arrayFloat32DataTimeSeries.at(i), &arrayFloat32SyncTimeSeries.at(i));
+            arrayFloat32Exts.at(i) = ".npy";
+        }
         for(int i = 0; i < lidarPointCloudNames.size(); i++){
             getFileInPath(lidarPointCloudDirs.at(i), ".json", &lidarPointCloudDataTimeSeries.at(i), &lidarPointCloudSyncTimeSeries.at(i));
             lidarPointCloudExts.at(i) = ".json";
         }
-        for(int i = 0; i < robotBaseVelNames.size(); i++){
-            getFileInPath(robotBaseVelDirs.at(i), ".json", &robotBaseVelDataTimeSeries.at(i), &robotBaseVelSyncTimeSeries.at(i));
-            robotBaseVelExts.at(i) = ".json";
+        for(int i = 0; i < robotBaseOdometryNames.size(); i++){
+            getFileInPath(robotBaseOdometryDirs.at(i), ".json", &robotBaseOdometryDataTimeSeries.at(i), &robotBaseOdometrySyncTimeSeries.at(i));
+            robotBaseOdometryExts.at(i) = ".json";
+        }
+        for(int i = 0; i < robotBaseVelocityNames.size(); i++){
+            getFileInPath(robotBaseVelocityDirs.at(i), ".json", &robotBaseVelocityDataTimeSeries.at(i), &robotBaseVelocitySyncTimeSeries.at(i));
+            robotBaseVelocityExts.at(i) = ".json";
         }
         for(int i = 0; i < liftMotorNames.size(); i++){
             getFileInPath(liftMotorDirs.at(i), ".json", &liftMotorDataTimeSeries.at(i), &liftMotorSyncTimeSeries.at(i));
@@ -185,10 +215,13 @@ public:
                 std::vector<double> armJointStateCloserIndexs = std::vector<double>(armJointStateNames.size(), 0);
                 std::vector<double> armEndPoseCloserIndexs = std::vector<double>(armEndPoseNames.size(), 0);
                 std::vector<double> localizationPoseCloserIndexs = std::vector<double>(localizationPoseNames.size(), 0);
+                std::vector<double> force6dimCloserIndexs = std::vector<double>(force6dimNames.size(), 0);
                 std::vector<double> gripperEncoderCloserIndexs = std::vector<double>(gripperEncoderNames.size(), 0);
                 std::vector<double> imu9AxisCloserIndexs = std::vector<double>(imu9AxisNames.size(), 0);
+                std::vector<double> arrayFloat32CloserIndexs = std::vector<double>(arrayFloat32Names.size(), 0);
                 std::vector<double> lidarPointCloudCloserIndexs = std::vector<double>(lidarPointCloudNames.size(), 0);
-                std::vector<double> robotBaseVelCloserIndexs = std::vector<double>(robotBaseVelNames.size(), 0);
+                std::vector<double> robotBaseOdometryCloserIndexs = std::vector<double>(robotBaseOdometryNames.size(), 0);
+                std::vector<double> robotBaseVelocityCloserIndexs = std::vector<double>(robotBaseVelocityNames.size(), 0);
                 std::vector<double> liftMotorCloserIndexs = std::vector<double>(liftMotorNames.size(), 0);
                 // frameTime = allTimeSeries.at(i).time;
                 bool timeDiffPass = true;
@@ -288,6 +321,22 @@ public:
                         timeDiffPass = false;
                     localizationPoseCloserIndexs.at(i) = closerIndex;
                 }
+                for(int i = 0; i < force6dimNames.size() && timeDiffPass; i++){
+                    if(!force6dimToSyncs.at(i))
+                        continue;
+                    int closerIndex = 0;
+                    double closerTimeDiff = INFINITY;
+                    for(int j = 0; j < force6dimDataTimeSeries.at(i).size(); j++){
+                        double timeDiff = fabs(force6dimDataTimeSeries.at(i).at(j).time - frameTime);
+                        if(timeDiff < closerTimeDiff){
+                            closerTimeDiff = timeDiff;
+                            closerIndex = j;
+                        }
+                    }
+                    if(closerTimeDiff > timeDiffLimit)
+                        timeDiffPass = false;
+                    force6dimCloserIndexs.at(i) = closerIndex;
+                }
                 for(int i = 0; i < gripperEncoderNames.size() && timeDiffPass; i++){
                     if(!gripperEncoderToSyncs.at(i))
                         continue;
@@ -320,6 +369,22 @@ public:
                         timeDiffPass = false;
                     imu9AxisCloserIndexs.at(i) = closerIndex;
                 }
+                for(int i = 0; i < arrayFloat32Names.size() && timeDiffPass; i++){
+                    if(!arrayFloat32ToSyncs.at(i))
+                        continue;
+                    int closerIndex = 0;
+                    double closerTimeDiff = INFINITY;
+                    for(int j = 0; j < arrayFloat32DataTimeSeries.at(i).size(); j++){
+                        double timeDiff = fabs(arrayFloat32DataTimeSeries.at(i).at(j).time - frameTime);
+                        if(timeDiff < closerTimeDiff){
+                            closerTimeDiff = timeDiff;
+                            closerIndex = j;
+                        }
+                    }
+                    if(closerTimeDiff > timeDiffLimit)
+                        timeDiffPass = false;
+                    arrayFloat32CloserIndexs.at(i) = closerIndex;
+                }
                 for(int i = 0; i < lidarPointCloudNames.size() && timeDiffPass; i++){
                     if(!lidarPointCloudToSyncs.at(i))
                         continue;
@@ -336,13 +401,13 @@ public:
                         timeDiffPass = false;
                     lidarPointCloudCloserIndexs.at(i) = closerIndex;
                 }
-                for(int i = 0; i < robotBaseVelNames.size() && timeDiffPass; i++){
-                    if(!robotBaseVelToSyncs.at(i))
+                for(int i = 0; i < robotBaseOdometryNames.size() && timeDiffPass; i++){
+                    if(!robotBaseOdometryToSyncs.at(i))
                         continue;
                     int closerIndex = 0;
                     double closerTimeDiff = INFINITY;
-                    for(int j = 0; j < robotBaseVelDataTimeSeries.at(i).size(); j++){
-                        double timeDiff = fabs(robotBaseVelDataTimeSeries.at(i).at(j).time - frameTime);
+                    for(int j = 0; j < robotBaseOdometryDataTimeSeries.at(i).size(); j++){
+                        double timeDiff = fabs(robotBaseOdometryDataTimeSeries.at(i).at(j).time - frameTime);
                         if(timeDiff < closerTimeDiff){
                             closerTimeDiff = timeDiff;
                             closerIndex = j;
@@ -350,7 +415,23 @@ public:
                     }
                     if(closerTimeDiff > timeDiffLimit)
                         timeDiffPass = false;
-                    robotBaseVelCloserIndexs.at(i) = closerIndex;
+                    robotBaseOdometryCloserIndexs.at(i) = closerIndex;
+                }
+                for(int i = 0; i < robotBaseVelocityNames.size() && timeDiffPass; i++){
+                    if(!robotBaseVelocityToSyncs.at(i))
+                        continue;
+                    int closerIndex = 0;
+                    double closerTimeDiff = INFINITY;
+                    for(int j = 0; j < robotBaseVelocityDataTimeSeries.at(i).size(); j++){
+                        double timeDiff = fabs(robotBaseVelocityDataTimeSeries.at(i).at(j).time - frameTime);
+                        if(timeDiff < closerTimeDiff){
+                            closerTimeDiff = timeDiff;
+                            closerIndex = j;
+                        }
+                    }
+                    if(closerTimeDiff > timeDiffLimit)
+                        timeDiffPass = false;
+                    robotBaseVelocityCloserIndexs.at(i) = closerIndex;
                 }
                 for(int i = 0; i < liftMotorNames.size() && timeDiffPass; i++){
                     if(!liftMotorToSyncs.at(i))
@@ -406,6 +487,12 @@ public:
                     localizationPoseDataTimeSeries.at(i).at(localizationPoseCloserIndexs.at(i)).toSyncList();
                     localizationPoseDataTimeSeries.at(i).erase(localizationPoseDataTimeSeries.at(i).begin(), localizationPoseDataTimeSeries.at(i).begin() + localizationPoseCloserIndexs.at(i) + 1);
                 }
+                for(int i = 0; i < force6dimNames.size(); i++){
+                    if(!force6dimToSyncs.at(i))
+                        continue;
+                    force6dimDataTimeSeries.at(i).at(force6dimCloserIndexs.at(i)).toSyncList();
+                    force6dimDataTimeSeries.at(i).erase(force6dimDataTimeSeries.at(i).begin(), force6dimDataTimeSeries.at(i).begin() + force6dimCloserIndexs.at(i) + 1);
+                }
                 for(int i = 0; i < gripperEncoderNames.size(); i++){
                     if(!gripperEncoderToSyncs.at(i))
                         continue;
@@ -418,17 +505,29 @@ public:
                     imu9AxisDataTimeSeries.at(i).at(imu9AxisCloserIndexs.at(i)).toSyncList();
                     imu9AxisDataTimeSeries.at(i).erase(imu9AxisDataTimeSeries.at(i).begin(), imu9AxisDataTimeSeries.at(i).begin() + imu9AxisCloserIndexs.at(i) + 1);
                 }
+                for(int i = 0; i < arrayFloat32Names.size(); i++){
+                    if(!arrayFloat32ToSyncs.at(i))
+                        continue;
+                    arrayFloat32DataTimeSeries.at(i).at(arrayFloat32CloserIndexs.at(i)).toSyncList();
+                    arrayFloat32DataTimeSeries.at(i).erase(arrayFloat32DataTimeSeries.at(i).begin(), arrayFloat32DataTimeSeries.at(i).begin() + arrayFloat32CloserIndexs.at(i) + 1);
+                }
                 for(int i = 0; i < lidarPointCloudNames.size(); i++){
                     if(!lidarPointCloudToSyncs.at(i))
                         continue;
                     lidarPointCloudDataTimeSeries.at(i).at(lidarPointCloudCloserIndexs.at(i)).toSyncList();
                     lidarPointCloudDataTimeSeries.at(i).erase(lidarPointCloudDataTimeSeries.at(i).begin(), lidarPointCloudDataTimeSeries.at(i).begin() + lidarPointCloudCloserIndexs.at(i) + 1);
                 }
-                for(int i = 0; i < robotBaseVelNames.size(); i++){
-                    if(!robotBaseVelToSyncs.at(i))
+                for(int i = 0; i < robotBaseOdometryNames.size(); i++){
+                    if(!robotBaseOdometryToSyncs.at(i))
                         continue;
-                    robotBaseVelDataTimeSeries.at(i).at(robotBaseVelCloserIndexs.at(i)).toSyncList();
-                    robotBaseVelDataTimeSeries.at(i).erase(robotBaseVelDataTimeSeries.at(i).begin(), robotBaseVelDataTimeSeries.at(i).begin() + robotBaseVelCloserIndexs.at(i) + 1);
+                    robotBaseOdometryDataTimeSeries.at(i).at(robotBaseOdometryCloserIndexs.at(i)).toSyncList();
+                    robotBaseOdometryDataTimeSeries.at(i).erase(robotBaseOdometryDataTimeSeries.at(i).begin(), robotBaseOdometryDataTimeSeries.at(i).begin() + robotBaseOdometryCloserIndexs.at(i) + 1);
+                }
+                for(int i = 0; i < robotBaseVelocityNames.size(); i++){
+                    if(!robotBaseVelocityToSyncs.at(i))
+                        continue;
+                    robotBaseVelocityDataTimeSeries.at(i).at(robotBaseVelocityCloserIndexs.at(i)).toSyncList();
+                    robotBaseVelocityDataTimeSeries.at(i).erase(robotBaseVelocityDataTimeSeries.at(i).begin(), robotBaseVelocityDataTimeSeries.at(i).begin() + robotBaseVelocityCloserIndexs.at(i) + 1);
                 }
                 for(int i = 0; i < liftMotorNames.size(); i++){
                     if(!liftMotorToSyncs.at(i))
@@ -478,6 +577,12 @@ public:
                 file<<std::to_string(localizationPoseSyncTimeSeries.at(i).at(j).time)<<localizationPoseExts.at(i)<<std::endl;
             file.close();
         }
+        for(int i = 0; i < force6dimNames.size(); i++){
+            std::ofstream file(force6dimDirs.at(i) + "/sync.txt");
+            for(int j = 0; j < force6dimSyncTimeSeries.at(i).size(); j++)
+                file<<std::to_string(force6dimSyncTimeSeries.at(i).at(j).time)<<force6dimExts.at(i)<<std::endl;
+            file.close();
+        }
         for(int i = 0; i < gripperEncoderNames.size(); i++){
             std::ofstream file(gripperEncoderDirs.at(i) + "/sync.txt");
             for(int j = 0; j < gripperEncoderSyncTimeSeries.at(i).size(); j++)
@@ -490,16 +595,28 @@ public:
                 file<<std::to_string(imu9AxisSyncTimeSeries.at(i).at(j).time)<<imu9AxisExts.at(i)<<std::endl;
             file.close();
         }
+        for(int i = 0; i < arrayFloat32Names.size(); i++){
+            std::ofstream file(arrayFloat32Dirs.at(i) + "/sync.txt");
+            for(int j = 0; j < arrayFloat32SyncTimeSeries.at(i).size(); j++)
+                file<<std::to_string(arrayFloat32SyncTimeSeries.at(i).at(j).time)<<arrayFloat32Exts.at(i)<<std::endl;
+            file.close();
+        }
         for(int i = 0; i < lidarPointCloudNames.size(); i++){
             std::ofstream file(lidarPointCloudDirs.at(i) + "/sync.txt");
             for(int j = 0; j < lidarPointCloudSyncTimeSeries.at(i).size(); j++)
                 file<<std::to_string(lidarPointCloudSyncTimeSeries.at(i).at(j).time)<<lidarPointCloudExts.at(i)<<std::endl;
             file.close();
         }
-        for(int i = 0; i < robotBaseVelNames.size(); i++){
-            std::ofstream file(robotBaseVelDirs.at(i) + "/sync.txt");
-            for(int j = 0; j < robotBaseVelSyncTimeSeries.at(i).size(); j++)
-                file<<std::to_string(robotBaseVelSyncTimeSeries.at(i).at(j).time)<<robotBaseVelExts.at(i)<<std::endl;
+        for(int i = 0; i < robotBaseOdometryNames.size(); i++){
+            std::ofstream file(robotBaseOdometryDirs.at(i) + "/sync.txt");
+            for(int j = 0; j < robotBaseOdometrySyncTimeSeries.at(i).size(); j++)
+                file<<std::to_string(robotBaseOdometrySyncTimeSeries.at(i).at(j).time)<<robotBaseOdometryExts.at(i)<<std::endl;
+            file.close();
+        }
+        for(int i = 0; i < robotBaseVelocityNames.size(); i++){
+            std::ofstream file(robotBaseVelocityDirs.at(i) + "/sync.txt");
+            for(int j = 0; j < robotBaseVelocitySyncTimeSeries.at(i).size(); j++)
+                file<<std::to_string(robotBaseVelocitySyncTimeSeries.at(i).at(j).time)<<robotBaseVelocityExts.at(i)<<std::endl;
             file.close();
         }
         for(int i = 0; i < liftMotorNames.size(); i++){
@@ -585,6 +702,18 @@ public:
                     time = time > localizationPoseDataTimeSeries.at(i).back().time ? time : localizationPoseDataTimeSeries.at(i).back().time;
             }
         }
+        for(int i = 0; i < force6dimNames.size() && result; i++){
+            if(force6dimToSyncs.at(i)){
+                if(force6dimDataTimeSeries.at(i).size() == 0){
+                    if(print){
+                        std::cout<<"force6dim "<<force6dimNames.at(i)<<" has no data"<<std::endl;
+                    }
+                    result = false;
+                }
+                else
+                    time = time > force6dimDataTimeSeries.at(i).back().time ? time : force6dimDataTimeSeries.at(i).back().time;
+            }
+        }
         for(int i = 0; i < gripperEncoderNames.size() && result; i++){
             if(gripperEncoderToSyncs.at(i)){
                 if(gripperEncoderDataTimeSeries.at(i).size() == 0){
@@ -609,6 +738,18 @@ public:
                     time = time > imu9AxisDataTimeSeries.at(i).back().time ? time : imu9AxisDataTimeSeries.at(i).back().time;
             }
         }
+        for(int i = 0; i < arrayFloat32Names.size() && result; i++){
+            if(arrayFloat32ToSyncs.at(i)){
+                if(arrayFloat32DataTimeSeries.at(i).size() == 0){
+                    if(print){
+                        std::cout<<"arrayFloat32 "<<arrayFloat32Names.at(i)<<" has no data"<<std::endl;
+                    }
+                    result = false;
+                }
+                else
+                    time = time > arrayFloat32DataTimeSeries.at(i).back().time ? time : arrayFloat32DataTimeSeries.at(i).back().time;
+            }
+        }
         for(int i = 0; i < lidarPointCloudNames.size() && result; i++){
             if(lidarPointCloudToSyncs.at(i)){
                 if(lidarPointCloudDataTimeSeries.at(i).size() == 0){
@@ -621,16 +762,28 @@ public:
                     time = time > lidarPointCloudDataTimeSeries.at(i).back().time ? time : lidarPointCloudDataTimeSeries.at(i).back().time;
             }
         }
-        for(int i = 0; i < robotBaseVelNames.size() && result; i++){
-            if(robotBaseVelToSyncs.at(i)){
-                if(robotBaseVelDataTimeSeries.at(i).size() == 0){
+        for(int i = 0; i < robotBaseOdometryNames.size() && result; i++){
+            if(robotBaseOdometryToSyncs.at(i)){
+                if(robotBaseOdometryDataTimeSeries.at(i).size() == 0){
                     if(print){
-                        std::cout<<"robotBase vel "<<robotBaseVelNames.at(i)<<" has no data"<<std::endl;
+                        std::cout<<"robotBase odometry "<<robotBaseOdometryNames.at(i)<<" has no data"<<std::endl;
                     }
                     result = false;
                 }
                 else
-                    time = time > robotBaseVelDataTimeSeries.at(i).back().time ? time : robotBaseVelDataTimeSeries.at(i).back().time;
+                    time = time > robotBaseOdometryDataTimeSeries.at(i).back().time ? time : robotBaseOdometryDataTimeSeries.at(i).back().time;
+            }
+        }
+        for(int i = 0; i < robotBaseVelocityNames.size() && result; i++){
+            if(robotBaseVelocityToSyncs.at(i)){
+                if(robotBaseVelocityDataTimeSeries.at(i).size() == 0){
+                    if(print){
+                        std::cout<<"robotBase velocity "<<robotBaseVelocityNames.at(i)<<" has no data"<<std::endl;
+                    }
+                    result = false;
+                }
+                else
+                    time = time > robotBaseVelocityDataTimeSeries.at(i).back().time ? time : robotBaseVelocityDataTimeSeries.at(i).back().time;
             }
         }
         for(int i = 0; i < liftMotorNames.size() && result; i++){
