@@ -5,8 +5,8 @@
 <div align="center">
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/ario-dataset/ARIO-dataset-agilex/blob/master/LICENSE)
-![ubuntu](https://img.shields.io/badge/Ubuntu-20.04-orange.svg)
-![ROS1](https://img.shields.io/badge/ROS-noetic-blue.svg)
+![ubuntu](https://img.shields.io/badge/Ubuntu-22.04-orange.svg)
+![ROS2](https://img.shields.io/badge/ROS-humble-blue.svg)
 
 </div>
 
@@ -32,28 +32,38 @@ Download our source code, and place this package in the workspace {YOUR_WS}/src.
 ```shell
 cd {YOUR_WS}/src
 git clone https://github.com/agilexrobotics/data_tools.git
+cd data_tools && git checkout ros2
 git clone https://github.com/agilexrobotics/data_msgs.git
+cd data_msgs && git checkout ros2
 cd {YOUR_WS}
-catkin_make -DCATKIN_WHITELIST_PACKAGES="data_msgs"
-source devel/setup.bash
-catkin_make -DCATKIN_WHITELIST_PACKAGES=""
+colcon build --packages-select data_msgs
+source 
+colcon build
 ```
 ## Run
+
+Run mcap to ario(if your data is mcap).
+
+```bash
+source ~/{YOUR_WS}/install/setup.sh
+cd ~/{YOUR_WS}/src/data_tools/scripts/
+python3 mcap_to_aloha_data.py --datasetDir {your_dataset_dir} --alohaYaml {your_ws_dir}/src/data_tools/config/aloha_data_params.yaml
+```
 
 Run the data collection code.
 
 ```bash
-source ~/{YOUR_WS}/devel/setup.sh
+source ~/{YOUR_WS}/install/setup.sh
 # aloha
-roslaunch data_tools run_data_capture.launch type:=aloha datasetDir:={data_path} episodeIndex:=0
+ros2 launch data_tools run_data_capture.launch.py type:=aloha datasetDir:={data_path} episodeIndex:=0
 # single pika
-roslaunch data_tools run_data_capture.launch type:=single_pika datasetDir:={data_path} episodeIndex:=0
+ros2 launch data_tools run_data_capture.launch.py type:=single_pika datasetDir:={data_path} episodeIndex:=0
 # double pika
-roslaunch data_tools run_data_capture.launch type:=multi_pika datasetDir:={data_path} episodeIndex:=0
+ros2 launch data_tools run_data_capture.launch.py type:=multi_pika datasetDir:={data_path} episodeIndex:=0
 # single pika teleop
-roslaunch data_tools run_data_capture.launch type:=single_pika_teleop datasetDir:={data_path} episodeIndex:=0
+ros2 launch data_tools run_data_capture.launch.py type:=single_pika_teleop datasetDir:={data_path} episodeIndex:=0
 # double pika teleop
-roslaunch data_tools run_data_capture.launch type:=multi_pika_teleop datasetDir:={data_path} episodeIndex:=0
+ros2 launch data_tools run_data_capture.launch.py type:=multi_pika_teleop datasetDir:={data_path} episodeIndex:=0
 ```
 If successful, the following status will be displayed.
 
@@ -83,7 +93,7 @@ If "Done" is displayed, it means the data just collected has been written to the
 Done
 [data_tools_dataCapture-1] process has finished cleanly
 log file: /home/noetic/.ros/log/21114750-1995-11ef-b6f1-578b5ce9ba2e/data_tools_dataCapture-1*.log
-all processes on machine have died, roslaunch will exit
+all processes on machine have died, ros2 launch will exit
 shutting down processing monitor...
 ... shutting down processing monitor complete
 done
@@ -157,27 +167,27 @@ episode0
 
 ## Synchronize the datasets
 ```shell
-source ~/{YOUR_WS}/devel/setup.sh
+source ~/{YOUR_WS}/install/setup.sh
 # aloha
-roslaunch data_tools run_data_sync.launch type:=aloha datasetDir:={data_path}
+ros2 launch data_tools run_data_sync.launch.py type:=aloha datasetDir:={data_path}
 # single pika
-roslaunch data_tools run_data_sync.launch type:=single_pika datasetDir:={data_path} 
+ros2 launch data_tools run_data_sync.launch.py type:=single_pika datasetDir:={data_path} 
 # double pika
-roslaunch data_tools run_data_sync.launch type:=multi_pika datasetDir:={data_path}
+ros2 launch data_tools run_data_sync.launch.py type:=multi_pika datasetDir:={data_path}
 # single pika teleop
-roslaunch data_tools run_data_sync.launch type:=single_pika_teleop datasetDir:={data_path}
+ros2 launch data_tools run_data_sync.launch.py type:=single_pika_teleop datasetDir:={data_path}
 # double pika teleop
-roslaunch data_tools run_data_sync.launch type:=multi_pika_teleop datasetDir:={data_path}
+ros2 launch data_tools run_data_sync.launch.py type:=multi_pika_teleop datasetDir:={data_path}
 ```
 or
 ```shell
-source ~/{YOUR_WS}/devel/setup.sh
+source ~/{YOUR_WS}/install/setup.sh
 # aloha
-python3 data_sync.py --type aloha --datasetDir {data_path}
+python3 data_sync.py --type aloha --datasetDir {data_path} 
 # single pika
-python3 data_sync.py --type single_pika --datasetDir {data_path}
+python3 data_sync.py --type single_pika --datasetDir {data_path} 
 # double pika
-python3 data_sync.py --type multi_pika --datasetDir {data_path}
+python3 data_sync.py --type multi_pika --datasetDir {data_path} 
 # single pika teleop
 python3 data_sync.py --type single_pika_teleop --datasetDir {data_path}
 # double pika teleop
@@ -188,7 +198,7 @@ After execution, a `sync.txt` file will be generated in the path of each specifi
 
 ## create point cloud(optional)
 ```shell
-source ~/{YOUR_WS}/devel/setup.sh
+source ~/{YOUR_WS}/install/setup.sh
 # aloha
 python3 camera_point_cloud_filter.py --type aloha --datasetDir {data_path}
 # single pika
@@ -207,7 +217,7 @@ Run the following code to generate a data.hdf5 file in the path of the task0 tas
 
 use point cloud
 ```shell
-source ~/{YOUR_WS}/devel/setup.sh
+source ~/{YOUR_WS}/install/setup.sh
 # aloha
 python3 data_to_hdf5.py --type aloha --useCameraPointCloud true --datasetDir {data_path}
 # single pika
@@ -221,7 +231,7 @@ python3 data_to_hdf5.py --type multi_pika_teleop --useCameraPointCloud true --da
 ```
 not use point cloud
 ```shell
-source ~/{YOUR_WS}/devel/setup.sh
+source ~/{YOUR_WS}/install/setup.sh
 # aloha
 python3 data_to_hdf5.py --type aloha --useCameraPointCloud "" --datasetDir {data_path}
 # single pika
@@ -235,7 +245,7 @@ python3 data_to_hdf5.py --type multi_pika_teleop --useCameraPointCloud "" --data
 ```
 By default, color, depth, and pointcloud in HDF5 use file indexing, so the original data files still need to be preserved. If you do not want to use indexes, you can use the following command:
 ```shell
-source ~/{YOUR_WS}/devel/setup.sh
+source ~/{YOUR_WS}/install/setup.sh
 # aloha
 python3 data_to_hdf5.py --type aloha --useCameraPointCloud "" --datasetDir {data_path} --useIndex "" --datasetTargetDir {hdf5_saving_path}
 # single pika
@@ -251,21 +261,21 @@ python3 data_to_hdf5.py --type multi_pika_teleop --useCameraPointCloud "" --data
 ## How to publish data
 use original data
 ```shell
-source ~/{YOUR_WS}/devel/setup.sh
+source ~/{YOUR_WS}/install/setup.sh
 # aloha
-roslaunch data_tools run_data_publish.launch type:=aloha datasetDir:={data_path} episodeIndex:=0
+ros2 launch data_tools run_data_publish.launch.py type:=aloha datasetDir:={data_path} episodeIndex:=0
 # single pika
-roslaunch data_tools run_data_publish.launch type:=single_pika datasetDir:={data_path} episodeIndex:=0
+ros2 launch data_tools run_data_publish.launch.py type:=single_pika datasetDir:={data_path} episodeIndex:=0
 # double pika
-roslaunch data_tools run_data_publish.launch type:=multi_pika datasetDir:={data_path} episodeIndex:=0
+ros2 launch data_tools run_data_publish.launch.py type:=multi_pika datasetDir:={data_path} episodeIndex:=0
 # single pika teleop
-roslaunch data_tools run_data_publish.launch type:=single_pika_teleop datasetDir:={data_path} episodeIndex:=0
+ros2 launch data_tools run_data_publish.launch.py type:=single_pika_teleop datasetDir:={data_path} episodeIndex:=0
 # double pika teleop
-roslaunch data_tools run_data_publish.launch type:=multi_pika_teleop datasetDir:={data_path} episodeIndex:=0
+ros2 launch data_tools run_data_publish.launch.py type:=multi_pika_teleop datasetDir:={data_path} episodeIndex:=0
 ```
 use hdf5 data
 ```shell
-source ~/{YOUR_WS}/devel/setup.sh
+source ~/{YOUR_WS}/install/setup.sh
 # aloha
 python3 data_publish.py --type aloha --datasetDir {data_path} --episodeName episode0
 # single pika
@@ -312,7 +322,7 @@ if your config file name is xxx_data_params.yaml,
 set:
 ```
 python: --type xxx
-roslaunch: type:=xxx
+ros2 launch: type:=xxx
 ```
 
 Ensure that all configured sensors are online and above 25Hz, otherwise data collection and synchronization will fail.

@@ -80,7 +80,7 @@ public:
 
     double timeDiffLimit;
 
-    DataSync(std::string datasetDir, int episodeIndex, double timeDiffLimit): DataUtility(datasetDir, episodeIndex) {
+    DataSync(std::string name, const rclcpp::NodeOptions & options, std::string datasetDir, int episodeIndex, double timeDiffLimit): DataUtility(name, options, datasetDir, episodeIndex) {
         this->timeDiffLimit = timeDiffLimit;
         cameraColorDataTimeSeries = std::vector<std::vector<TimeSeries>>(cameraColorNames.size());
         cameraDepthDataTimeSeries = std::vector<std::vector<TimeSeries>>(cameraDepthNames.size());
@@ -512,7 +512,7 @@ public:
 
     double checkDataAdequacy(bool print=false){
         bool result = true;
-        double time = INFINITY;
+        double time = -1;
         for(int i = 0; i < cameraColorNames.size() && result; i++){
             if(cameraColorToSyncs.at(i)){
                 if(cameraColorDataTimeSeries.at(i).size() == 0){
@@ -522,7 +522,7 @@ public:
                     result = false;
                 }
                 else
-                    time = time < cameraColorDataTimeSeries.at(i).back().time ? time : cameraColorDataTimeSeries.at(i).back().time;
+                    time = time > cameraColorDataTimeSeries.at(i).back().time ? time : cameraColorDataTimeSeries.at(i).back().time;
             }
         }
         for(int i = 0; i < cameraDepthNames.size() && result; i++){
@@ -534,7 +534,7 @@ public:
                     result = false;
                 }
                 else
-                    time = time < cameraDepthDataTimeSeries.at(i).back().time ? time : cameraDepthDataTimeSeries.at(i).back().time;
+                    time = time > cameraDepthDataTimeSeries.at(i).back().time ? time : cameraDepthDataTimeSeries.at(i).back().time;
             }
         }
         for(int i = 0; i < cameraPointCloudNames.size() && result; i++){
@@ -546,7 +546,7 @@ public:
                     result = false;
                 }
                 else
-                    time = time < cameraPointCloudDataTimeSeries.at(i).back().time ? time : cameraPointCloudDataTimeSeries.at(i).back().time;
+                    time = time > cameraPointCloudDataTimeSeries.at(i).back().time ? time : cameraPointCloudDataTimeSeries.at(i).back().time;
             }
         }
         for(int i = 0; i < armJointStateNames.size() && result; i++){
@@ -558,7 +558,7 @@ public:
                     result = false;
                 }
                 else
-                    time = time < armJointStateDataTimeSeries.at(i).back().time ? time : armJointStateDataTimeSeries.at(i).back().time;
+                    time = time > armJointStateDataTimeSeries.at(i).back().time ? time : armJointStateDataTimeSeries.at(i).back().time;
             }
         }
         for(int i = 0; i < armEndPoseNames.size() && result; i++){
@@ -570,7 +570,7 @@ public:
                     result = false;
                 }
                 else
-                    time = time < armEndPoseDataTimeSeries.at(i).back().time ? time : armEndPoseDataTimeSeries.at(i).back().time;
+                    time = time > armEndPoseDataTimeSeries.at(i).back().time ? time : armEndPoseDataTimeSeries.at(i).back().time;
             }
         }
         for(int i = 0; i < localizationPoseNames.size() && result; i++){
@@ -582,7 +582,7 @@ public:
                     result = false;
                 }
                 else
-                    time = time < localizationPoseDataTimeSeries.at(i).back().time ? time : localizationPoseDataTimeSeries.at(i).back().time;
+                    time = time > localizationPoseDataTimeSeries.at(i).back().time ? time : localizationPoseDataTimeSeries.at(i).back().time;
             }
         }
         for(int i = 0; i < gripperEncoderNames.size() && result; i++){
@@ -594,7 +594,7 @@ public:
                     result = false;
                 }
                 else
-                    time = time < gripperEncoderDataTimeSeries.at(i).back().time ? time : gripperEncoderDataTimeSeries.at(i).back().time;
+                    time = time > gripperEncoderDataTimeSeries.at(i).back().time ? time : gripperEncoderDataTimeSeries.at(i).back().time;
             }
         }
         for(int i = 0; i < imu9AxisNames.size() && result; i++){
@@ -606,7 +606,7 @@ public:
                     result = false;
                 }
                 else
-                    time = time < imu9AxisDataTimeSeries.at(i).back().time ? time : imu9AxisDataTimeSeries.at(i).back().time;
+                    time = time > imu9AxisDataTimeSeries.at(i).back().time ? time : imu9AxisDataTimeSeries.at(i).back().time;
             }
         }
         for(int i = 0; i < lidarPointCloudNames.size() && result; i++){
@@ -618,7 +618,7 @@ public:
                     result = false;
                 }
                 else
-                    time = time < lidarPointCloudDataTimeSeries.at(i).back().time ? time : lidarPointCloudDataTimeSeries.at(i).back().time;
+                    time = time > lidarPointCloudDataTimeSeries.at(i).back().time ? time : lidarPointCloudDataTimeSeries.at(i).back().time;
             }
         }
         for(int i = 0; i < robotBaseVelNames.size() && result; i++){
@@ -630,7 +630,7 @@ public:
                     result = false;
                 }
                 else
-                    time = time < robotBaseVelDataTimeSeries.at(i).back().time ? time : robotBaseVelDataTimeSeries.at(i).back().time;
+                    time = time > robotBaseVelDataTimeSeries.at(i).back().time ? time : robotBaseVelDataTimeSeries.at(i).back().time;
             }
         }
         for(int i = 0; i < liftMotorNames.size() && result; i++){
@@ -642,7 +642,7 @@ public:
                     result = false;
                 }
                 else
-                    time = time < liftMotorDataTimeSeries.at(i).back().time ? time : liftMotorDataTimeSeries.at(i).back().time;
+                    time = time > liftMotorDataTimeSeries.at(i).back().time ? time : liftMotorDataTimeSeries.at(i).back().time;
             }
         }
         return result ? time : INFINITY;
@@ -666,33 +666,68 @@ public:
 };
 
 
-int main(int argc, char** argv)
-{
-    ros::init(argc, argv, "data_sync");
-    ros::NodeHandle nh;
+class DataSyncService: public rclcpp::Node{
+    public:
+    rclcpp::executors::SingleThreadedExecutor *exec;
+    std::shared_ptr<DataSync> dataSync;
+    bool useService;
     std::string datasetDir;
     int episodeIndex;
+    rclcpp::NodeOptions options;
+    std::string name;
     double timeDiffLimit;
-    nh.param<std::string>("datasetDir", datasetDir, "/home/agilex/data");
-    nh.param<int>("episodeIndex", episodeIndex, 0);
-    nh.param<double>("timeDiffLimit", timeDiffLimit, 0.1);
-    ROS_INFO("\033[1;32m----> data sync Started.\033[0m");
-    if(episodeIndex == -1){
-        for (const auto& entry : boost::filesystem::directory_iterator(datasetDir)) {
-            const auto& path = entry.path();
-            std::string fileName = path.stem().string();
-            if(fileName.substr(0, 7) == "episode" && fileName.substr(fileName.length() - 7, 7) != ".tar.gz"){
-                std::cout<<fileName<<" processing"<<std::endl;
-                fileName.replace(0, 7, "");
-                DataSync dataSync(datasetDir, std::stoi(fileName), timeDiffLimit);
-                dataSync.sync();
-                std::cout<<fileName<<" done"<<std::endl;
+    DataSyncService(std::string name, const rclcpp::NodeOptions & options): rclcpp::Node(name, options) {
+        exec = nullptr;
+        this->options = options;
+        this->name = name;
+        declare_parameter("datasetDir", "/home/agilex/data");get_parameter("datasetDir", datasetDir);
+        declare_parameter("episodeIndex", 0);get_parameter("episodeIndex", episodeIndex);
+        declare_parameter("timeDiffLimit", 0.1);get_parameter("timeDiffLimit", timeDiffLimit);
+        if(episodeIndex == -1){
+            for (const auto& entry : boost::filesystem::directory_iterator(datasetDir)) {
+                const auto& path = entry.path();
+                std::string fileName = path.stem().string();
+                if(fileName.substr(0, 7) == "episode" && fileName.substr(fileName.length() - 7, 7) != ".tar.gz"){
+                    std::cout<<fileName<<" processing"<<std::endl;
+                    fileName.replace(0, 7, "");
+                    exec = new rclcpp::executors::SingleThreadedExecutor;
+                    std::string workerName = name + "_worker_" + std::to_string(rclcpp::Clock().now().nanoseconds());
+                    dataSync = std::make_shared<DataSync>(workerName, options, datasetDir, std::stoi(fileName), timeDiffLimit);
+                    exec->add_node(dataSync);
+                    ((DataSync *)dataSync.get())->sync();
+                    delete exec;
+                    exec = nullptr;
+                    std::cout<<fileName<<" done"<<std::endl;
+                }
             }
+            rclcpp::shutdown();
+            std::cout<<"Done"<<std::endl;
+        }else{
+            exec = new rclcpp::executors::SingleThreadedExecutor;
+            std::string workerName = name + "_worker_" + std::to_string(rclcpp::Clock().now().nanoseconds());
+            dataSync = std::make_shared<DataSync>(workerName, options, datasetDir, episodeIndex, timeDiffLimit);
+            exec->add_node(dataSync);
+            ((DataSync *)dataSync.get())->sync();
+            rclcpp::shutdown();
+            std::cout<<"Done"<<std::endl;
         }
-    }else{
-        DataSync dataSync(datasetDir, episodeIndex, timeDiffLimit);
-        dataSync.sync();
     }
+};
+
+
+
+
+int main(int argc, char** argv)
+{
+    rclcpp::init(argc, argv);
+    rclcpp::NodeOptions options;
+    options.use_intra_process_comms(true);
+    RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "\033[1;32m----> data sync Started.\033[0m");
+    rclcpp::executors::SingleThreadedExecutor exec;
+    auto dataSyncService = std::make_shared<DataSyncService>("data_sync", options);
+    exec.add_node(dataSyncService);
+    exec.spin();
+    rclcpp::shutdown();
     std::cout<<"Done"<<std::endl;
     return 0;
 }

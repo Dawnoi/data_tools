@@ -161,7 +161,7 @@ class Operator:
     def process(self):
         for i in range(len(self.args.cameraNames)):
             os.system(f"rm -rf {self.cameraPointCloudNormDirs[i]}")
-            os.system(f"mkdir {self.cameraPointCloudNormDirs[i]}")
+            os.system(f"mkdir -p {self.cameraPointCloudNormDirs[i]}")
             use_point_cloud = os.path.exists(self.cameraPointCloudSyncDirs[i])
             if use_point_cloud:
                 os.system(f"cp {self.cameraPointCloudConfigDirs[i]} {self.cameraPointCloudNormConfigDirs[i]}")
@@ -220,10 +220,14 @@ class Operator:
 
                             with open(self.cameraColorConfigDirs[i], 'r') as color_config_file:
                                 data = json.load(color_config_file)
-                                color_extrinsic = create_transformation_matrix(data["parent_frame"]['x'], data["parent_frame"]['y'], data["parent_frame"]['z'], data["parent_frame"]['roll'], data["parent_frame"]['pitch'], data["parent_frame"]['yaw'])
+                                color_extrinsic = create_transformation_matrix(0, 0, 0, 0, 0, 0)
+                                if 'parent_frame' in data:
+                                    color_extrinsic = create_transformation_matrix(data["parent_frame"]['x'], data["parent_frame"]['y'], data["parent_frame"]['z'], data["parent_frame"]['roll'], data["parent_frame"]['pitch'], data["parent_frame"]['yaw'])
                                 with open(self.cameraPointCloudConfigDirs[i], 'r') as point_cloud_config_file:
                                     data = json.load(point_cloud_config_file)
-                                    point_cloud_extrinsic = create_transformation_matrix(data["parent_frame"]['x'], data["parent_frame"]['y'], data["parent_frame"]['z'], data["parent_frame"]['roll'], data["parent_frame"]['pitch'], data["parent_frame"]['yaw'])
+                                    point_cloud_extrinsic = create_transformation_matrix(0, 0, 0, 0, 0, 0)
+                                    if 'parent_frame' in data:
+                                        point_cloud_extrinsic = create_transformation_matrix(data["parent_frame"]['x'], data["parent_frame"]['y'], data["parent_frame"]['z'], data["parent_frame"]['roll'], data["parent_frame"]['pitch'], data["parent_frame"]['yaw'])
                                     if not np.array_equal(color_extrinsic, point_cloud_extrinsic):
                                         pcd = o3d.geometry.PointCloud()
                                         pcd.points = o3d.utility.Vector3dVector(pc[:, :3])
@@ -279,11 +283,15 @@ class Operator:
                 with open(self.cameraColorConfigDirs[i], 'r') as color_config_file:
                     data = json.load(color_config_file)
                     color_intrinsic = np.array(data["K"]).reshape(3, 3)
-                    color_extrinsic = create_transformation_matrix(data["parent_frame"]['x'], data["parent_frame"]['y'], data["parent_frame"]['z'], data["parent_frame"]['roll'], data["parent_frame"]['pitch'], data["parent_frame"]['yaw'])
+                    color_extrinsic = create_transformation_matrix(0, 0, 0, 0, 0, 0)
+                    if 'parent_frame' in data:
+                        color_extrinsic = create_transformation_matrix(data["parent_frame"]['x'], data["parent_frame"]['y'], data["parent_frame"]['z'], data["parent_frame"]['roll'], data["parent_frame"]['pitch'], data["parent_frame"]['yaw'])
                     with open(self.cameraDepthConfigDirs[i], 'r') as depth_config_file:
                         data = json.load(depth_config_file)
                         depth_intrinsic = np.array(data["K"]).reshape(3, 3)
-                        depth_extrinsic = create_transformation_matrix(data["parent_frame"]['x'], data["parent_frame"]['y'], data["parent_frame"]['z'], data["parent_frame"]['roll'], data["parent_frame"]['pitch'], data["parent_frame"]['yaw'])
+                        depth_extrinsic = create_transformation_matrix(0, 0, 0, 0, 0, 0)
+                        if 'parent_frame' in data:
+                            depth_extrinsic = create_transformation_matrix(data["parent_frame"]['x'], data["parent_frame"]['y'], data["parent_frame"]['z'], data["parent_frame"]['roll'], data["parent_frame"]['pitch'], data["parent_frame"]['yaw'])
                         with open(self.cameraColorSyncDirs[i], 'r') as color_lines:
                             with open(self.cameraDepthSyncDirs[i], 'r') as depth_lines:
                                 with open(self.cameraPointCloudNormSyncDirs[i], "w") as f:
@@ -397,7 +405,7 @@ def get_arguments():
 
     with open(f'../config/{args.type}_data_params.yaml', 'r') as file:
         yaml_data = yaml.safe_load(file)
-        args.cameraNames = yaml_data['dataInfo']['camera']['depth']['names']
+        args.cameraNames = yaml_data['/**']['ros__parameters']['dataInfo']['camera']['depth']['names']
 
     return args
 
@@ -408,10 +416,13 @@ def main():
         for f in os.listdir(args.datasetDir):
             if not f.endswith(".tar.gz"):
                 args.episodeName = f
-                print("episode name: ", args.episodeName, "processing")
-                operator = Operator(args)
-                operator.process()
-                print("episode name: ", args.episodeName, "done")
+                print("episode name:", args.episodeName, "processing")
+                try:
+                    operator = Operator(args)
+                    operator.process()
+                except:
+                    pass
+                print("episode name:", args.episodeName, "done")
     else:
         operator = Operator(args)
         operator.process()

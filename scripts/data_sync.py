@@ -110,7 +110,7 @@ class Operator:
         if not os.path.exists(path):
             print(f"Warning: Directory {path} does not exist")
             return count
-            
+
         for filename in os.listdir(path):
             if filename.endswith(ext):
                 try:
@@ -195,7 +195,7 @@ class Operator:
     def check_data_adequacy(self, print_info: bool = False) -> Optional[float]:
         """检查数据充足性，返回最早的可用时间戳"""
         result = True
-        time = float('inf')
+        time = -1
         
         # 检查所有数据源是否都有数据
         for i, name in enumerate(self.args.cameraColorNames):
@@ -204,7 +204,7 @@ class Operator:
                     print(f"Camera color {name} has no data")
                 result = False
             else:
-                time = min(time, self.camera_color_data_time_series[i][-1].time)
+                time = max(time, self.camera_color_data_time_series[i][-1].time)
         
         for i, name in enumerate(self.args.cameraDepthNames):
             if len(self.camera_depth_data_time_series[i]) == 0:
@@ -212,7 +212,7 @@ class Operator:
                     print(f"Camera depth {name} has no data")
                 result = False
             else:
-                time = min(time, self.camera_depth_data_time_series[i][-1].time)
+                time = max(time, self.camera_depth_data_time_series[i][-1].time)
         
         for i, name in enumerate(self.args.cameraPointCloudNames):
             if len(self.camera_point_cloud_data_time_series[i]) == 0:
@@ -220,7 +220,7 @@ class Operator:
                     print(f"Camera point cloud {name} has no data")
                 result = False
             else:
-                time = min(time, self.camera_point_cloud_data_time_series[i][-1].time)
+                time = max(time, self.camera_point_cloud_data_time_series[i][-1].time)
         
         for i, name in enumerate(self.args.armJointStateNames):
             if len(self.arm_joint_state_data_time_series[i]) == 0:
@@ -228,7 +228,7 @@ class Operator:
                     print(f"Arm joint state {name} has no data")
                 result = False
             else:
-                time = min(time, self.arm_joint_state_data_time_series[i][-1].time)
+                time = max(time, self.arm_joint_state_data_time_series[i][-1].time)
         
         for i, name in enumerate(self.args.armEndPoseNames):
             if len(self.arm_end_pose_data_time_series[i]) == 0:
@@ -236,7 +236,7 @@ class Operator:
                     print(f"Arm end pose {name} has no data")
                 result = False
             else:
-                time = min(time, self.arm_end_pose_data_time_series[i][-1].time)
+                time = max(time, self.arm_end_pose_data_time_series[i][-1].time)
                 
         for i, name in enumerate(self.args.localizationPoseNames):
             if len(self.localization_pose_data_time_series[i]) == 0:
@@ -244,7 +244,7 @@ class Operator:
                     print(f"Localization pose {name} has no data")
                 result = False
             else:
-                time = min(time, self.localization_pose_data_time_series[i][-1].time)
+                time = max(time, self.localization_pose_data_time_series[i][-1].time)
         
         for i, name in enumerate(self.args.gripperEncoderNames):
             if len(self.gripper_encoder_data_time_series[i]) == 0:
@@ -252,7 +252,7 @@ class Operator:
                     print(f"Gripper encoder {name} has no data")
                 result = False
             else:
-                time = min(time, self.gripper_encoder_data_time_series[i][-1].time)
+                time = max(time, self.gripper_encoder_data_time_series[i][-1].time)
         
         for i, name in enumerate(self.args.imu9AxisNames):
             if len(self.imu_9axis_data_time_series[i]) == 0:
@@ -260,7 +260,7 @@ class Operator:
                     print(f"IMU 9-axis {name} has no data")
                 result = False
             else:
-                time = min(time, self.imu_9axis_data_time_series[i][-1].time)
+                time = max(time, self.imu_9axis_data_time_series[i][-1].time)
         
         for i, name in enumerate(self.args.lidarPointCloudNames):
             if len(self.lidar_point_cloud_data_time_series[i]) == 0:
@@ -268,7 +268,7 @@ class Operator:
                     print(f"Lidar point cloud {name} has no data")
                 result = False
             else:
-                time = min(time, self.lidar_point_cloud_data_time_series[i][-1].time)
+                time = max(time, self.lidar_point_cloud_data_time_series[i][-1].time)
         
         for i, name in enumerate(self.args.robotBaseVelNames):
             if len(self.robot_base_vel_data_time_series[i]) == 0:
@@ -276,7 +276,7 @@ class Operator:
                     print(f"Robot base velocity {name} has no data")
                 result = False
             else:
-                time = min(time, self.robot_base_vel_data_time_series[i][-1].time)
+                time = max(time, self.robot_base_vel_data_time_series[i][-1].time)
         
         for i, name in enumerate(self.args.liftMotorNames):
             if len(self.lift_motor_data_time_series[i]) == 0:
@@ -284,7 +284,7 @@ class Operator:
                     print(f"Lift motor {name} has no data")
                 result = False
             else:
-                time = min(time, self.lift_motor_data_time_series[i][-1].time)
+                time = max(time, self.lift_motor_data_time_series[i][-1].time)
         
         return time if result else None
 
@@ -671,17 +671,17 @@ def get_arguments():
 
     with open(f'../config/{args.type}_data_params.yaml', 'r') as file:
         yaml_data = yaml.safe_load(file)
-        args.cameraColorNames = yaml_data['dataInfo']['camera']['color']['names']
-        args.cameraDepthNames = yaml_data['dataInfo']['camera']['depth']['names']
-        args.cameraPointCloudNames = yaml_data['dataInfo']['camera']['pointCloud']['names']
-        args.armJointStateNames = yaml_data['dataInfo']['arm']['jointState']['names']
-        args.armEndPoseNames = yaml_data['dataInfo']['arm']['endPose']['names']
-        args.localizationPoseNames = yaml_data['dataInfo']['localization']['pose']['names']
-        args.gripperEncoderNames = yaml_data['dataInfo']['gripper']['encoder']['names']
-        args.imu9AxisNames = yaml_data['dataInfo']['imu']['9axis']['names']
-        args.lidarPointCloudNames = yaml_data['dataInfo']['lidar']['pointCloud']['names']
-        args.robotBaseVelNames = yaml_data['dataInfo']['robotBase']['vel']['names']
-        args.liftMotorNames = yaml_data['dataInfo']['lift']['motor']['names']
+        args.cameraColorNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('camera', {}).get('color', {}).get('names', [])
+        args.cameraDepthNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('camera', {}).get('depth', {}).get('names', [])
+        args.cameraPointCloudNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('camera', {}).get('pointCloud', {}).get('names', [])
+        args.armJointStateNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('arm', {}).get('jointState', {}).get('names', [])
+        args.armEndPoseNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('arm', {}).get('endPose', {}).get('names', [])
+        args.localizationPoseNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('localization', {}).get('pose', {}).get('names', [])
+        args.gripperEncoderNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('gripper', {}).get('encoder', {}).get('names', [])
+        args.imu9AxisNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('imu', {}).get('9axis', {}).get('names', [])
+        args.lidarPointCloudNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('lidar', {}).get('pointCloud', {}).get('names', [])
+        args.robotBaseVelNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('robotBase', {}).get('vel', {}).get('names', [])
+        args.liftMotorNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('lift', {}).get('motor', {}).get('names', [])
     return args
 
 

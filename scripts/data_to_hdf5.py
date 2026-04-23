@@ -86,13 +86,17 @@ class Operator:
         self.cameraDepthConfigDirs = [os.path.join(self.cameraDepthDirs[i], "config.json") for i in range(len(self.args.cameraDepthNames))]
         self.cameraPointCloudConfigDirs = [os.path.join(self.cameraPointCloudDirs[i], "config.json") for i in range(len(self.args.cameraPointCloudNames))]
 
-        self.instructionsDir = "instructions.npy"
+        self.instructionsJsonDir = os.path.join(self.episodeDir, "instructions.json")
         if self.args.useIndex:
-            self.dataFile = os.path.join(self.episodeDir, "data.hdf5")
+            self.dataFile = os.path.join(self.episodeDir, self.args.episodeName + ".hdf5")
+            early_dataFile = os.path.join(self.episodeDir, "data.hdf5")
+            os.system(f"rm -rf {early_dataFile}")
         else:
-            self.dataFile = os.path.join(self.args.datasetTargetDir, self.args.episodeName + ".hdf5")
+            os.makedirs(self.args.targetDir, exist_ok=True)
+            self.dataFile = os.path.join(self.args.targetDir, self.args.episodeName + ".hdf5")
 
     def process(self):
+        error = False
         data_dict = {}
         for cameraColorName in self.args.cameraColorNames:
             data_dict[f'camera/color/{cameraColorName}'] = []
@@ -127,7 +131,31 @@ class Operator:
             data_dict[f'robotBase/vel/{robotBaseVelName}'] = []
         for liftMotorName in self.args.liftMotorNames:
             data_dict[f'lift/motor/{liftMotorName}'] = []
-        data_dict[f'instruction'] = self.instructionsDir
+        data_dict[f'instructions/full_instructions/text'] = []
+        data_dict[f'instructions/segment_instructions/start_time'] = []
+        data_dict[f'instructions/segment_instructions/end_time'] = []
+        data_dict[f'instructions/full_instructions/text'].append('null')
+        if os.path.exists(self.instructionsJsonDir):
+            with open(self.instructionsJsonDir, 'r') as file:
+                data = json.load(file)
+                data_dict[f'instructions/full_instructions/text'] = []
+                if 'full-instructions' in data.keys():
+                    for text in data['full-instructions']:
+                        data_dict[f'instructions/full_instructions/text'].append(text)
+                elif 'instructions' in data.keys():
+                    for text in data['instructions']:
+                        data_dict[f'instructions/full_instructions/text'].append(text)
+                else:
+                    data_dict[f'instructions/full_instructions/text'].append('null')
+                if 'segment-instructions' in data.keys():
+                    for segment_instructions in data['segment-instructions']:
+                        start_time = segment_instructions['start_time']
+                        end_time = segment_instructions['end_time']
+                        data_dict[f'instructions/segment_instructions/start_time'].append(start_time)
+                        data_dict[f'instructions/segment_instructions/end_time'].append(end_time)
+                        data_dict[f'instructions/segment_instructions/{start_time}-{end_time}/text'] = []
+                        for text in segment_instructions['instructions']:
+                            data_dict[f'instructions/segment_instructions/{start_time}-{end_time}/text'].append(text)
         data_dict[f'timestamp'] = []
         data_dict[f'size'] = 0
         size_count = 0
@@ -146,7 +174,7 @@ class Operator:
                     if self.args.useIndex:
                         data_dict[f'camera/color/{self.args.cameraColorNames[i]}'].append(os.path.join(self.cameraColorDirs[i][len(self.episodeDir)+1:], line))
                     else:
-                        data_dict[f'camera/color/{self.args.cameraColorNames[i]}'].append(cv2.imread(os.path.join(self.cameraColorDirs[i], line)))
+                        data_dict[f'camera/color/{self.args.cameraColorNames[i]}'].append(cv2.imread(os.path.join(self.cameraColorDirs[i], line), cv2.IMREAD_UNCHANGED))
                     # print(os.path.join(self.cameraColorDirs[i], line))
                     # cv2.imread(os.path.join(self.cameraColorDirs[i], line))
                     count += 1
@@ -173,7 +201,7 @@ class Operator:
                     if self.args.useIndex:
                         data_dict[f'camera/depth/{self.args.cameraDepthNames[i]}'].append(os.path.join(self.cameraDepthDirs[i][len(self.episodeDir)+1:], line))
                     else:
-                        data_dict[f'camera/depth/{self.args.cameraDepthNames[i]}'].append(cv2.imread(os.path.join(self.cameraDepthDirs[i], line)))
+                        data_dict[f'camera/depth/{self.args.cameraDepthNames[i]}'].append(cv2.imread(os.path.join(self.cameraDepthDirs[i], line), cv2.IMREAD_UNCHANGED))
                     # print(os.path.join(self.cameraDepthDirs[i], line))
                     # img = cv2.imread(os.path.join(self.cameraDepthDirs[i], line), cv2.IMREAD_UNCHANGED).flatten()
                     # print(max(img), min(img))
@@ -212,6 +240,36 @@ class Operator:
             #     data_dict[f'camera/pointCloudIntrinsic/{self.args.cameraPointCloudNames[i]}'] = point_cloud_intrinsic
             #     data_dict[f'camera/pointCloudExtrinsic/{self.args.cameraPointCloudNames[i]}'] = point_cloud_extrinsic
         for i in range(len(self.args.armJointStateNames)):
+            master_arm_gripper_mm = False
+            if 'master' in self.args.armJointStateNames[i]:
+                with open(self.armJointStateSyncDirs[i], 'r') as lines:
+                    count = 0
+                    for t, line in enumerate(lines):
+                        line = line.replace('\n', '')
+                        with open(os.path.join(self.armJointStateDirs[i], line), 'r') as file:
+                            data = json.load(file)
+                            position = np.array(data['position'])
+                            if abs(position[6]) > 1:
+                                count += 1
+                            if count > 30:
+                                master_arm_gripper_mm = True
+                                break
+            arm_not_moving = True
+            with open(self.armJointStateSyncDirs[i], 'r') as lines:
+                first_position = None
+                for t, line in enumerate(lines):
+                    line = line.replace('\n', '')
+                    with open(os.path.join(self.armJointStateDirs[i], line), 'r') as file:
+                        data = json.load(file)
+                        position = np.array(data['position'])
+                        if first_position is None:
+                            first_position = position
+                        if not (position - first_position == 0).all():
+                            arm_not_moving = False
+                            break
+            if arm_not_moving:
+                error = True
+                print(self.args.armJointStateNames[i], "arm not moving!!!!!!!!!!")
             with open(self.armJointStateSyncDirs[i], 'r') as lines:
                 count = 0
                 for t, line in enumerate(lines):
@@ -225,15 +283,20 @@ class Operator:
                         data_dict[f'timestamp'][count] = time if time < data_dict[f'timestamp'][count] else data_dict[f'timestamp'][count]
                     with open(os.path.join(self.armJointStateDirs[i], line), 'r') as file:
                         data = json.load(file)
-                        limit_lower = np.array([-2.6179, 0, -2.967, -1.745, -1.22, -2.09439, 0])
-                        limit_upper = np.array([2.6179, 3.14, 0, 1.745, 1.22, 2.09439, 0.10])
+                        # limit_lower = np.array([-2.6179, 0, -2.967, -1.745, -1.22, -2.09439, 0])
+                        # limit_upper = np.array([2.6179, 3.14, 0, 1.745, 1.22, 2.09439, 0.10])
+                        limit_lower = np.array([-150*math.pi/180, 0, -170*math.pi/180, -100*math.pi/180, -70*math.pi/180, -120*math.pi/180, 0])
+                        limit_upper = np.array([150*math.pi/180, math.pi, 0, 100*math.pi/180, 70*math.pi/180, 120*math.pi/180, 0.10])
                         position = np.array(data['position'])
-                        out_limit = ((position - limit_lower) < -0.1).any() | ((limit_upper - position) < -0.1).any()
+                        if master_arm_gripper_mm:
+                            position[6] /= 1000
+                        out_limit = ((position - limit_lower) < -0.2).any() or ((limit_upper - position) < -0.2).any()
                         if out_limit:
+                            error = True
                             print(self.args.armJointStateNames[i], position)
                             min_val, flat_idx = (position - limit_lower).min(), (position - limit_lower).argmin()
                             print("lower:", min_val, flat_idx)
-                            min_val, flat_idx = (limit_upper - position).min(), (position - limit_lower).argmin()
+                            min_val, flat_idx = (limit_upper - position).min(), (limit_upper - position).argmin()
                             print("upper:", min_val, flat_idx)
                             print("out_limit!!!!!!!!!!!!!!!!!!!!!!!!!!")
                         data_dict[f'arm/jointStateVelocity/{self.args.armJointStateNames[i]}'].append(np.array(data['velocity']))
@@ -377,9 +440,11 @@ class Operator:
                 if size_count == 0:
                     size_count = count
         data_dict['size'] = size_count
-        with h5py.File(self.dataFile, 'w', rdcc_nbytes=1024 ** 2 * 2) as root:
-            for key in data_dict:
-                root.create_dataset(key, data=data_dict[key])
+        if True:  # not error:
+            with h5py.File(self.dataFile, 'w', rdcc_nbytes=1024 ** 2 * 2) as root:
+                for key in data_dict:
+                    root.create_dataset(key, data=data_dict[key])
+        return error
 
 
 def get_arguments():
@@ -388,7 +453,7 @@ def get_arguments():
                         default="/home/agilex/data", required=False)
     parser.add_argument('--episodeName', action='store', type=str, help='episodeName',
                         default="", required=False)
-    parser.add_argument('--datasetTargetDir', action='store', type=str, help='datasetTargetDir',
+    parser.add_argument('--targetDir', action='store', type=str, help='targetDir',
                         default="/home/agilex/data", required=False)
     parser.add_argument('--useIndex', action='store', type=bool, help='useIndex',
                         default=True, required=False)
@@ -426,18 +491,19 @@ def get_arguments():
 
     with open(f'../config/{args.type}_data_params.yaml', 'r') as file:
         yaml_data = yaml.safe_load(file)
-        args.cameraColorNames = yaml_data['dataInfo']['camera']['color']['names']
-        args.cameraDepthNames = yaml_data['dataInfo']['camera']['depth']['names']
-        args.cameraPointCloudNames = yaml_data['dataInfo']['camera']['pointCloud']['names']
-        args.armJointStateNames = yaml_data['dataInfo']['arm']['jointState']['names']
-        args.armEndPoseNames = yaml_data['dataInfo']['arm']['endPose']['names']
-        args.localizationPoseNames = yaml_data['dataInfo']['localization']['pose']['names']
-        args.gripperEncoderNames = yaml_data['dataInfo']['gripper']['encoder']['names']
-        args.imu9AxisNames = yaml_data['dataInfo']['imu']['9axis']['names']
-        args.lidarPointCloudNames = yaml_data['dataInfo']['lidar']['pointCloud']['names']
-        args.robotBaseVelNames = yaml_data['dataInfo']['robotBase']['vel']['names']
-        args.liftMotorNames = yaml_data['dataInfo']['lift']['motor']['names']
-
+        args.cameraColorNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('camera', {}).get('color', {}).get('names', [])
+        args.cameraDepthNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('camera', {}).get('depth', {}).get('names', [])
+        args.cameraPointCloudNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('camera', {}).get('pointCloud', {}).get('names', [])
+        args.armJointStateNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('arm', {}).get('jointState', {}).get('names', [])
+        args.armEndPoseNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('arm', {}).get('endPose', {}).get('names', [])
+        args.localizationPoseNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('localization', {}).get('pose', {}).get('names', [])
+        args.gripperEncoderNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('gripper', {}).get('encoder', {}).get('names', [])
+        args.imu9AxisNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('imu', {}).get('9axis', {}).get('names', [])
+        args.lidarPointCloudNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('lidar', {}).get('pointCloud', {}).get('names', [])
+        args.robotBaseVelNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('robotBase', {}).get('vel', {}).get('names', [])
+        args.liftMotorNames = yaml_data.get('/**', {}).get('ros__parameters', {}).get('dataInfo', {}).get('lift', {}).get('motor', {}).get('names', [])
+        if args.useCameraPointCloud:
+            args.cameraPointCloudNames = args.cameraDepthNames
     return args
 
 
