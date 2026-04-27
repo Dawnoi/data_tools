@@ -25,9 +25,9 @@ def generate_launch_description():
             parameters=[params_file],
             output='screen',
             remappings=[
-                # gripper action → nero_ctrl_single_node 的 gripper_ctrl（带 flip 回调）
-                ('/nero_inference_l/action_gripper', '/gripper_ctrl_l'),
-                ('/nero_inference_r/action_gripper', '/gripper_ctrl_r'),
+                # Note: No remapping for action_gripper here.
+                # nero_IK node subscribes to /nero_inference/action_gripper directly
+                # and forwards to its local gripper_ctrl topic for nero_ctrl_single_node.
             ],
         )
     ])

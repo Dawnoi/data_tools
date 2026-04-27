@@ -1,7 +1,7 @@
 /**:
   ros__parameters:
     server:
-      host: "192.168.0.157"
+      host: "192.168.100.27"
       port: 8007
 
     inference:
@@ -12,19 +12,22 @@
       auto_reset: true
 
     debug:
-      enabled: false
+      enabled: true
       dir: "/home/yxgn/data_streamer_debug"
-      camera_names: "gripperFisheye_l,gripperFisheye_r"
+      # RGB相机
+      camera_names: "gripperCamera_l"
+      # 鱼眼相机
+      # camera_names: "gripperFisheye_l"
       arm_names: "arm_l,arm_r"
       gripper_names: "gripper_l,gripper_r"
 
     action:
       enabled: true
       arm_index: 0
-      # topic must match nero_IK subscription: /nero_inference{index_name}/action
-      # index_name='' (single arm) -> /nero_inference/action
+      # topic must match arm_pose_inference_executor subscription: /nero_inference{index_name}/action
+      # index_name='_l' (left arm) -> /nero_inference_l/action
       # index_name='_r' (right arm) -> /nero_inference_r/action
-      topic: "/nero_inference/action"
+      topic: "/nero_inference_l/action"
 
     save_action:
       enabled: true
@@ -48,8 +51,12 @@
       color:
         width: 1280
         height: 720
-        topics: ['/gripper/camera_fisheye_l/color/image_raw', '/gripper/camera_fisheye_r/color/image_raw']
-        names: ['gripperFisheye_l', 'gripperFisheye_r']
+        # RGB相机
+        topics: ['/camera_l/color/image_raw', '/camera_r/color/image_raw']
+        names: ['gripperCamera_l', 'gripperCamera_r']
+        # 鱼眼相机
+        # topics: ['/camera_fisheye_l/color/image_raw', '/camera_fisheye_r/color/image_raw']
+        # names: ['gripperFisheye_l', 'gripperFisheye_r']
 
     arm:
       endPose:
@@ -57,21 +64,40 @@
         names: ['arm_l', 'arm_r']
         orient: [true, true]
         offset: [0.0, 0.0]
-      # 双臂   
+      # 双臂 RGB相机
+      # active_arms: "arm_l,arm_r"
+      # active_arm_gripper_names: "arm_l:gripper_l,arm_r:gripper_r"
+      # active_arm_camera_names: "arm_l:gripperCamera_l,arm_r:gripperCamera_r"
+      # per_arm_cameras: "arm_l:gripperCamera_l,arm_r:gripperCamera_r"
+      # 双臂 鱼眼相机
       # active_arms: "arm_l,arm_r"
       # active_arm_gripper_names: "arm_l:gripper_l,arm_r:gripper_r"
       # active_arm_camera_names: "arm_l:gripperFisheye_l,arm_r:gripperFisheye_r"
       # per_arm_cameras: "arm_l:gripperFisheye_l,arm_r:gripperFisheye_r"
-      # 右臂单独采集
+      # 右臂单独采集 RGB相机
+      # active_arms: "arm_r"
+      # active_arm_gripper_names: "arm_r:gripper_r"
+      # active_arm_camera_names: "arm_r:gripperCamera_r"
+      # per_arm_cameras: "arm_r:gripperCamera_r"
+      # 右臂单独采集 鱼眼相机
       # active_arms: "arm_r"
       # active_arm_gripper_names: "arm_r:gripper_r"
       # active_arm_camera_names: "arm_r:gripperFisheye_r"
       # per_arm_cameras: "arm_r:gripperFisheye_r"
-      # 左臂单独采集
+      # 左臂单独采集 RGB相机
+      # active_arms: "arm_l"
+      # active_arm_gripper_names: "arm_l:gripper_l"
+      # active_arm_camera_names: "arm_l:gripperCamera_l"
+      # per_arm_cameras: "arm_l:gripperCamera_l"
+      # 左臂单独采集 鱼眼相机
+      # active_arms: "arm_l"
+      # active_arm_gripper_names: "arm_l:gripper_l"
+      # active_arm_camera_names: "arm_l:gripperFisheye_l"
+      # per_arm_cameras: "arm_l:gripperFisheye_l"
       active_arms: "arm_l"
       active_arm_gripper_names: "arm_l:gripper_l"
-      active_arm_camera_names: "arm_l:gripperFisheye_l"
-      per_arm_cameras: "arm_l:gripperFisheye_l"
+      active_arm_camera_names: "arm_l:gripperCamera_l"
+      per_arm_cameras: "arm_l:gripperCamera_l"
       # Remote sensor poses (teleop master device)
       remote_pose:
         topics: ['/pika_pose_r', '/pika_pose_l']
@@ -79,5 +105,5 @@
 
     gripper:
       encoder:
-        topics: ['/sensor/gripper_l/data', '/sensor/gripper_r/data', '/gripper/gripper_l/data', '/gripper/gripper_r/data']
-        names: ['sensor_l', 'sensor_r', 'gripper_l', 'gripper_r']
+        topics: ['/gripper_l/data', '/gripper_r/data']
+        names: ['gripper_l', 'gripper_r']

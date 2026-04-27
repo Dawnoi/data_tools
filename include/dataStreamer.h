@@ -291,7 +291,13 @@ public:
         while (true) {
             char buf[4096];
             ssize_t n = ::recv(sock_fd_, buf, sizeof(buf) - 1, 0);
-            if (n <= 0) break;
+            if (n <= 0) {
+                if (n < 0) {
+                    RCLCPP_WARN(rclcpp::get_logger("SocketClient"),
+                        "recvJson: recv error errno=%d", errno);
+                }
+                break;
+            }
             buf[n] = '\0';
             line += buf;
 
@@ -305,16 +311,24 @@ public:
                     if (reader.parse(msg, parsed)) {
                         // Only return object or null — reject arrays/strings/etc
                         if (parsed.isObject()) {
+                            std::string type = parsed.get("type", "").asString();
+                            RCLCPP_INFO(rclcpp::get_logger("SocketClient"),
+                                "recvJson: returning type='%s', line_len=%zu", type.c_str(), msg.size());
                             return parsed;
                         }
                         RCLCPP_WARN(rclcpp::get_logger("SocketClient"),
                             "recvJson: discarding non-object JSON (type=%d)", parsed.type());
+                    } else {
+                        RCLCPP_WARN(rclcpp::get_logger("SocketClient"),
+                            "recvJson: JSON parse error, raw='%.100s'", msg.c_str());
                     }
                 }
             }
 
             if (std::chrono::steady_clock::now() >= deadline) break;
         }
+        RCLCPP_INFO(rclcpp::get_logger("SocketClient"),
+            "recvJson: returning null (line_buffer='%.100s')", line.c_str());
         return result;  // nullValue
     }
 
@@ -347,17 +361,17 @@ private:
     void gripperEncoderCallback(const data_msgs::msg::Gripper::SharedPtr msg, int idx);
 
     // Core loops
-    void collectLoop();
     void sendLoop();
     void recvLoop();
     void actionStepLoop();
+    void waitForExecutionComplete();
 
     // Helpers
     bool sendReset();
     std::string matToBase64Jpeg(const cv::Mat& img, int quality = 85);
     std::vector<double> poseStampedToVec7(const geometry_msgs::msg::PoseStamped& msg);
     bool checkActionSafety(const std::vector<double>& action, int arm_idx);
-    void publishAction(const std::vector<std::vector<double>>& actions);
+    bool publishAction(const std::vector<std::vector<double>>& actions);
 
     // ROS2 subscriptions
     std::vector<rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr> subCameraColors_;
@@ -391,6 +405,7 @@ private:
     double camera_freq_;
     int jpeg_quality_;
     bool auto_reset_;
+    double action_wait_timeout_sec_;
 
     // Observation buffer
     std::unique_ptr<ObservationBuffer> obs_buffer_;
@@ -436,24 +451,37 @@ private:
     std::string debug_dir_;
     std::atomic<int> debug_frame_idx_{0};
 
-    // Action save (for testing inference server output)
-    std::atomic<bool> save_action_enabled_{false};
-    std::string save_action_dir_;
-    std::atomic<int64_t> save_action_count_{0};
-
     // Counters
     std::atomic<int64_t> observations_sent_{0};
     std::atomic<int64_t> actions_received_{0};
     std::mutex action_mutex_;
+    std::mutex exec_target_mutex_;
+    std::vector<std::vector<double>> exec_target_poses_;
+
+    // Condition variable for pipeline synchronization:
+    // sendLoop pauses observation sending while action_sequence_in_progress_ is true.
+    // This ensures each inference is based on the true arm state after the previous
+    // action sequence completes (Scheme A: observe -> execute -> observe).
+    std::mutex pipeline_mutex_;
+    std::condition_variable pipeline_cv_;
+    bool waiting_for_action_ = false;  // true: obs sent, waiting for action response
+    double obs_sent_timestamp_ = 0.0;  // wall-clock time when obs was sent (for latency debug)
+
+    // Handshake state for action flow synchronization
+    std::mutex handshake_mutex_;
+    std::condition_variable handshake_cv_;
+    bool handshake_received_ = false;
+    double handshake_sent_timestamp_ = 0.0;
+    double handshake_received_timestamp_ = 0.0;
+    std::string handshake_arm_;
 
     std::vector<std::vector<std::vector<double>>> pending_actions_;  // per-arm multi-step sequences, index matches arm_names_
     int action_sequence_index_ = 0;  // current step index within the pending sequence
     int action_sequence_steps_total_ = 0;  // total steps in current sequence
     bool action_sequence_in_progress_ = false;  // guard: don't overwrite pending sequence with new action
+    bool action_sequence_any_published_ = false;  // tracks whether at least one step was published; if not, the sequence is considered failed
 
     // Camera info
-    int image_width_ = 1280;
-    int image_height_ = 720;
 
     // Safety filter state
     bool safety_enabled_ = true;
@@ -473,7 +501,7 @@ private:
     // Cumulative absolute pose for delta-based safety (per arm)
     std::mutex cumulative_pose_mutex_;
     std::map<std::string, std::vector<double>> arm_cumulative_pose_;  // arm_name -> 7D pose (xyz + quaternion)
-    std::map<std::string, double> arm_cumulative_gripper_;            // arm_name -> absolute gripper value [0,1]
+    std::map<std::string, double> arm_cumulative_gripper_;            // arm_name -> absolute gripper value [0,0.1]
 };
 
 #endif
