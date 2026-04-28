@@ -10,8 +10,9 @@
 #include <fstream>
 #include <sstream>
 
-namespace {
-const char* LOGGER_NAME = "DataStreamer";
+// =====================================================================
+// Helper utilities (anonymous namespace = internal linkage)
+// =====================================================================
 
 static const char BASE64_TABLE[] =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -47,6 +48,7 @@ bool mkdirRecursive(const std::string& path) {
     return true;
 }
 
+// Saves one observation frame to disk for offline debugging (only when debug.enabled=true).
 void saveDebugFrame(const std::string& dir, int frame_idx,
                     const std::vector<cv::Mat>& images,
                     const std::vector<std::string>& camera_names,
@@ -59,7 +61,6 @@ void saveDebugFrame(const std::string& dir, int frame_idx,
     std::ostringstream idx_str;
     idx_str << std::setw(6) << std::setfill('0') << frame_idx;
     std::string base_prefix = dir + "/" + idx_str.str();
-
     mkdirRecursive(dir);
 
     std::ofstream f(base_prefix + "_obs.json");
@@ -93,10 +94,280 @@ void saveDebugFrame(const std::string& dir, int frame_idx,
         pf.close();
     }
 }
+
+
+// =====================================================================
+// ObservationBuffer — implementation
+// =====================================================================
+
+void ObservationBuffer::addImage(int cam_idx, const cv::Mat& img, double ts) {
+    if (cam_idx < 0 || cam_idx >= n_cameras_) return;
+    std::lock_guard<std::mutex> lk(mutex_);
+    int k = static_cast<int>(image_buffers_[cam_idx].size());
+    int idx = (image_heads_[cam_idx] + image_counts_[cam_idx]) % k;
+    image_buffers_[cam_idx][idx] = img;
+    image_ts_buffers_[cam_idx][idx] = ts;
+    if (image_counts_[cam_idx] < k) {
+        image_counts_[cam_idx]++;
+    } else {
+        image_heads_[cam_idx] = (image_heads_[cam_idx] + 1) % k;
+    }
 }
+
+void ObservationBuffer::addArmState(int arm_idx, const std::vector<double>& pose, double gripper, double ts) {
+    if (arm_idx < 0 || arm_idx >= n_arms_) return;
+    std::lock_guard<std::mutex> lk(mutex_);
+    int k = static_cast<int>(pose_buffers_[arm_idx].size());
+    int idx = (state_heads_[arm_idx] + state_counts_[arm_idx]) % k;
+    pose_buffers_[arm_idx][idx] = pose;
+    gripper_buffers_[arm_idx][idx] = gripper;
+    state_ts_buffers_[arm_idx][idx] = ts;
+    if (state_counts_[arm_idx] < k) {
+        state_counts_[arm_idx]++;
+    } else {
+        state_heads_[arm_idx] = (state_heads_[arm_idx] + 1) % k;
+    }
+}
+
+bool ObservationBuffer::getAlignedObs(AlignedObs& out) {
+    std::lock_guard<std::mutex> lk(mutex_);
+    int k = 0;
+    if (!pose_buffers_.empty()) k = static_cast<int>(pose_buffers_[0].size());
+
+    for (int c = 0; c < n_cameras_; ++c) {
+        if (image_counts_[c] < k) return false;
+    }
+    for (int a = 0; a < n_arms_; ++a) {
+        if (state_counts_[a] < k) return false;
+    }
+
+    double last_ts = 0.0;
+    for (int a = 0; a < n_arms_; ++a) {
+        double t = state_ts_buffers_[a][(state_heads_[a] + state_counts_[a] - 1) % k];
+        if (a == 0 || t > last_ts) last_ts = t;
+    }
+
+    out.timestamps.resize(n_obs_steps_);
+    for (int i = 0; i < n_obs_steps_; ++i) {
+        out.timestamps[i] = last_ts - (n_obs_steps_ - 1 - i) * dt_;
+    }
+
+    // Align images by timestamp
+    out.images.resize(n_cameras_ * n_obs_steps_);
+    for (int c = 0; c < n_cameras_; ++c) {
+        int k_cam = static_cast<int>(image_buffers_[c].size());
+        std::vector<double> cam_ts(image_counts_[c]);
+        for (int i = 0; i < image_counts_[c]; ++i) {
+            int buf_idx = (image_heads_[c] + i) % k_cam;
+            cam_ts[i] = image_ts_buffers_[c][buf_idx];
+        }
+        double cam_oldest = image_counts_[c] > 0 ? cam_ts[0] : 0.0;
+        double cam_newest = image_counts_[c] > 0 ? cam_ts[image_counts_[c] - 1] : 0.0;
+        for (int i = 0; i < n_obs_steps_; ++i) {
+            double t = out.timestamps[i];
+            int best_idx = 0;
+            if (image_counts_[c] <= 1) {
+                best_idx = 0;
+            } else if (t <= cam_oldest) {
+                best_idx = 0;
+            } else if (t >= cam_newest) {
+                best_idx = image_counts_[c] - 1;
+            } else {
+                for (int j = 0; j < image_counts_[c] - 1; ++j) {
+                    if (cam_ts[j] <= t && cam_ts[j + 1] > t) { best_idx = j; break; }
+                }
+            }
+            int buf_idx = (image_heads_[c] + best_idx) % k_cam;
+            out.images[c * n_obs_steps_ + i] = image_buffers_[c][buf_idx];
+        }
+    }
+
+    // Align arm poses by timestamp
+    out.poses.resize(n_arms_ * n_obs_steps_);
+    out.grippers.resize(n_arms_ * n_obs_steps_);
+    for (int a = 0; a < n_arms_; ++a) {
+        int k_s = static_cast<int>(pose_buffers_[a].size());
+        std::vector<double> arm_ts(state_counts_[a]);
+        for (int i = 0; i < state_counts_[a]; ++i) {
+            int buf_idx = (state_heads_[a] + i) % k_s;
+            arm_ts[i] = state_ts_buffers_[a][buf_idx];
+        }
+        double arm_oldest = state_counts_[a] > 0 ? arm_ts[0] : 0.0;
+        double arm_newest = state_counts_[a] > 0 ? arm_ts[state_counts_[a] - 1] : 0.0;
+        for (int i = 0; i < n_obs_steps_; ++i) {
+            double t = out.timestamps[i];
+            int best_idx = 0;
+            if (state_counts_[a] <= 1) {
+                best_idx = 0;
+            } else if (t <= arm_oldest) {
+                best_idx = 0;
+            } else if (t >= arm_newest) {
+                best_idx = state_counts_[a] - 1;
+            } else {
+                for (int j = 0; j < state_counts_[a] - 1; ++j) {
+                    if (arm_ts[j] <= t && arm_ts[j + 1] > t) { best_idx = j; break; }
+                }
+            }
+            int buf_idx = (state_heads_[a] + best_idx) % k_s;
+            out.poses[a * n_obs_steps_ + i] = pose_buffers_[a][buf_idx];
+            out.grippers[a * n_obs_steps_ + i] = gripper_buffers_[a][buf_idx];
+        }
+    }
+    return true;
+}
+
+
+// =====================================================================
+// SocketClient — implementation
+// =====================================================================
+
+bool SocketClient::connect(double timeout_sec) {
+    disconnect();
+
+    struct addrinfo hints{}, *res;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+
+    int ret = getaddrinfo(host_.c_str(), std::to_string(port_).c_str(), &hints, &res);
+    if (ret != 0) {
+        RCLCPP_ERROR(rclcpp::get_logger("SocketClient"), "DNS lookup failed: %s", gai_strerror(ret));
+        return false;
+    }
+
+    sock_fd_ = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+    if (sock_fd_ < 0) {
+        RCLCPP_ERROR(rclcpp::get_logger("SocketClient"), "socket() failed: %s", strerror(errno));
+        freeaddrinfo(res);
+        return false;
+    }
+
+    struct timeval tv;
+    tv.tv_sec = static_cast<long>(timeout_sec);
+    tv.tv_usec = static_cast<long>((timeout_sec - (long)timeout_sec) * 1e6);
+    setsockopt(sock_fd_, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+    setsockopt(sock_fd_, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+    if (::connect(sock_fd_, res->ai_addr, res->ai_addrlen) < 0) {
+        RCLCPP_ERROR(rclcpp::get_logger("SocketClient"), "connect() to %s:%d failed: %s",
+                     host_.c_str(), port_, strerror(errno));
+        freeaddrinfo(res);
+        close(sock_fd_);
+        sock_fd_ = -1;
+        connected_ = false;
+        return false;
+    }
+    freeaddrinfo(res);
+    connected_ = true;
+    reconnect_attempts_ = 0;
+    return true;
+}
+
+bool SocketClient::reconnect(double timeout_sec) {
+    reconnect_attempts_++;
+    RCLCPP_INFO(rclcpp::get_logger("SocketClient"),
+                "[SocketClient] Reconnect #%d to %s:%d (attempt %d of %d)",
+                reconnect_attempts_, host_.c_str(), port_, reconnect_attempts_, max_reconnect_attempts_);
+    return connect(timeout_sec);
+}
+
+void SocketClient::disconnect() {
+    if (sock_fd_ >= 0) {
+        ::close(sock_fd_);
+        sock_fd_ = -1;
+    }
+    connected_ = false;
+}
+
+bool SocketClient::sendJson(const Json::Value& obj) {
+    if (!connected_ || sock_fd_ < 0) return false;
+    std::string msg = Json::FastWriter().write(obj) + "\n";
+    ssize_t sent = ::send(sock_fd_, msg.c_str(), msg.size(), MSG_NOSIGNAL);
+    return sent == static_cast<ssize_t>(msg.size());
+}
+
+Json::Value SocketClient::recvJson(double timeout_sec) {
+    Json::Value result;
+    if (!connected_ || sock_fd_ < 0) return result;
+
+    std::string line;
+    line.reserve(4096);
+    auto deadline = std::chrono::steady_clock::now()
+        + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+            std::chrono::duration<double>(timeout_sec));
+
+    while (true) {
+        char buf[4096];
+        ssize_t n = ::recv(sock_fd_, buf, sizeof(buf) - 1, 0);
+        if (n <= 0) {
+            if (n < 0) {
+                RCLCPP_WARN(rclcpp::get_logger("SocketClient"), "recvJson: recv error errno=%d", errno);
+            }
+            break;
+        }
+        buf[n] = '\0';
+        line += buf;
+
+        size_t pos;
+        while ((pos = line.find('\n')) != std::string::npos) {
+            std::string msg = line.substr(0, pos);
+            line.erase(0, pos + 1);
+            if (!msg.empty()) {
+                Json::Value parsed;
+                Json::Reader reader;
+                if (reader.parse(msg, parsed)) {
+                    if (parsed.isObject()) {
+                        return parsed;
+                    }
+                    RCLCPP_WARN(rclcpp::get_logger("SocketClient"),
+                                "recvJson: discarding non-object JSON (type=%d)", parsed.type());
+                } else {
+                    RCLCPP_WARN(rclcpp::get_logger("SocketClient"),
+                                "recvJson: JSON parse error, raw='%.100s'", msg.c_str());
+                }
+            }
+        }
+
+        if (std::chrono::steady_clock::now() >= deadline) break;
+    }
+    return result;
+}
+
+
+// =====================================================================
+// DataStreamer — implementation
+// =====================================================================
 
 DataStreamer::DataStreamer(const rclcpp::NodeOptions& options) : Node("data_streamer", options) {
 
+    // ----------------------------------------------------------------
+    // 1. Declare parameters with defaults
+    // ----------------------------------------------------------------
+    this->declare_parameter<std::string>("server.host", "127.0.0.1");
+    this->declare_parameter<int>("server.port", 8007);
+    this->declare_parameter<double>("inference.freq", 20.0);
+    this->declare_parameter<int>("inference.n_obs_steps", 2);
+    this->declare_parameter<double>("inference.camera_freq", 30.0);
+    this->declare_parameter<int>("inference.jpeg_quality", 85);
+    this->declare_parameter<bool>("inference.auto_reset", true);
+    this->declare_parameter<int>("action.arm_index", 0);
+    this->declare_parameter<bool>("action.enabled", true);
+    this->declare_parameter<bool>("debug.enabled", false);
+    this->declare_parameter<std::string>("debug.dir", "/home/yxgn/data_streamer_debug");
+
+    this->declare_parameter<std::string>("arm.active_arms", "arm_l,arm_r");
+    this->declare_parameter<std::string>("arm.active_arm_gripper_names", "arm_l:gripper_l,arm_r:gripper_r");
+    this->declare_parameter<std::string>("arm.per_arm_cameras", "arm_l:fisheye_l,arm_l:fisheye_r,arm_r:fisheye_l,arm_r:fisheye_r");
+
+    this->declare_parameter<bool>("safety.enabled", true);
+    this->declare_parameter<double>("safety.max_position_delta", 0.05);
+    this->declare_parameter<double>("safety.max_angle_delta", 0.5);
+    this->declare_parameter<double>("safety.publish_rate_hz", 20.0);
+    this->declare_parameter<bool>("safety.log_rejections", true);
+
+    // ----------------------------------------------------------------
+    // 2. Load ROS2 subscription topic parameters
+    // ----------------------------------------------------------------
     rcl_interfaces::msg::ParameterDescriptor desc;
     desc.name = "camera.color.topics";
     desc.type = rcl_interfaces::msg::ParameterType::PARAMETER_STRING_ARRAY;
@@ -107,10 +378,6 @@ DataStreamer::DataStreamer(const rclcpp::NodeOptions& options) : Node("data_stre
     this->declare_parameter("arm.endPose.topics", rclcpp::ParameterValue(std::vector<std::string>()), desc);
     desc.name = "arm.endPose.names";
     this->declare_parameter("arm.endPose.names", rclcpp::ParameterValue(std::vector<std::string>()), desc);
-    desc.name = "arm.endPose.orient";
-    this->declare_parameter("arm.endPose.orient", rclcpp::ParameterValue(std::vector<bool>()), desc);
-    desc.name = "arm.endPose.offset";
-    this->declare_parameter("arm.endPose.offset", rclcpp::ParameterValue(std::vector<double>()), desc);
     desc.name = "arm.remote_pose.topics";
     this->declare_parameter("arm.remote_pose.topics", rclcpp::ParameterValue(std::vector<std::string>()), desc);
     desc.name = "arm.remote_pose.names";
@@ -120,43 +387,12 @@ DataStreamer::DataStreamer(const rclcpp::NodeOptions& options) : Node("data_stre
     desc.name = "gripper.encoder.names";
     this->declare_parameter("gripper.encoder.names", rclcpp::ParameterValue(std::vector<std::string>()), desc);
 
-    this->declare_parameter<std::string>("server.host", "127.0.0.1");
-    this->declare_parameter<int>("server.port", 8007);
-    this->declare_parameter<double>("inference.freq", 20.0);
-    this->declare_parameter<int>("inference.n_obs_steps", 2);
-    this->declare_parameter<double>("inference.camera_freq", 30.0);
-    this->declare_parameter<int>("inference.jpeg_quality", 85);
-    this->declare_parameter<bool>("inference.auto_reset", true);
-    this->declare_parameter<double>("inference.action_wait_timeout_sec", 30.0);
-    this->declare_parameter<int>("camera.color.width", 1280);
-    this->declare_parameter<int>("camera.color.height", 720);
-    this->declare_parameter<int>("action.arm_index", 0);
-    this->declare_parameter<bool>("action.enabled", true);
-    this->declare_parameter<bool>("debug.enabled", false);
-    this->declare_parameter<std::string>("debug.dir", "/home/yxgn/data_streamer_debug");
-
-    this->declare_parameter<std::string>("arm.active_arms", "arm_l,arm_r");
-    this->declare_parameter<std::string>("arm.active_arm_gripper_names", "arm_l:gripper_l,arm_r:gripper_r");
-    this->declare_parameter<std::string>("arm.per_arm_cameras", "arm_l:fisheye_l,arm_l:fisheye_r,arm_r:fisheye_l,arm_r:fisheye_r");
-
-    // Safety filter parameters
-    this->declare_parameter<bool>("safety.enabled", true);
-    this->declare_parameter<double>("safety.max_position_delta", 0.05);
-    this->declare_parameter<double>("safety.max_gripper_delta", 0.3);
-    this->declare_parameter<double>("safety.max_angle_delta", 0.5);
-    this->declare_parameter<double>("safety.position_x_min", 0.0);
-    this->declare_parameter<double>("safety.position_x_max", 0.8);
-    this->declare_parameter<double>("safety.position_y_min", -0.6);
-    this->declare_parameter<double>("safety.position_y_max", 0.6);
-    this->declare_parameter<double>("safety.position_z_min", -0.2);
-    this->declare_parameter<double>("safety.position_z_max", 0.7);
-    this->declare_parameter<double>("safety.publish_rate_hz", 20.0);
-    this->declare_parameter<bool>("safety.log_rejections", true);
-    this->declare_parameter<bool>("safety.quaternion_multiply_body_frame", true);
-
+    // ----------------------------------------------------------------
+    // 3. Get all parameters
+    // ----------------------------------------------------------------
     this->get_parameter("camera.color.topics", cameraColorTopics_);
     this->get_parameter("camera.color.names", cameraColorNames_);
-    RCLCPP_INFO(this->get_logger(), "[DataStreamer] Loaded camera names (%zu): [%s], topics (%zu)",
+    RCLCPP_INFO(this->get_logger(), "[DataStreamer] Camera names (%zu): [%s], topics (%zu)",
                 cameraColorNames_.size(),
                 cameraColorNames_.empty() ? "EMPTY" : [&]() {
                     std::string s = cameraColorNames_[0];
@@ -167,24 +403,19 @@ DataStreamer::DataStreamer(const rclcpp::NodeOptions& options) : Node("data_stre
 
     this->get_parameter("arm.endPose.topics", armEndPoseTopics_);
     this->get_parameter("arm.endPose.names", armEndPoseNames_);
-    this->get_parameter("arm.endPose.orient", armEndPoseOrients_);
-    this->get_parameter("arm.endPose.offset", armEndPoseOffsets_);
 
     std::vector<std::string> remote_pose_topics_raw;
     std::vector<std::string> remote_pose_names_raw;
     this->get_parameter("arm.remote_pose.topics", remote_pose_topics_raw);
     this->get_parameter("arm.remote_pose.names", remote_pose_names_raw);
-
-    // Build arm_name -> pika_pose topic map
-    arm_pika_pose_topic_.clear();
     for (size_t i = 0; i < remote_pose_topics_raw.size() && i < remote_pose_names_raw.size(); ++i) {
         arm_pika_pose_topic_[remote_pose_names_raw[i]] = remote_pose_topics_raw[i];
-        bool is_left = (remote_pose_names_raw[i].find("l") != std::string::npos);
-        pika_pose_side_is_left_[remote_pose_names_raw[i]] = is_left;
     }
 
+    // Parse active arms from comma-separated string
     std::string active_arms_str;
     this->get_parameter("arm.active_arms", active_arms_str);
+    arm_names_.clear();
     {
         std::string s = active_arms_str;
         size_t start = 0;
@@ -196,7 +427,6 @@ DataStreamer::DataStreamer(const rclcpp::NodeOptions& options) : Node("data_stre
             }
         }
     }
-
     n_arms_ = static_cast<int>(arm_names_.size());
 
     arm_name_to_buffer_idx_.clear();
@@ -222,23 +452,20 @@ DataStreamer::DataStreamer(const rclcpp::NodeOptions& options) : Node("data_stre
                 if (!part.empty()) {
                     size_t colon = part.find(':');
                     if (colon != std::string::npos) {
-                        std::string arm_k = part.substr(0, colon);
-                        std::string gripper_k = part.substr(colon + 1);
-                        arm_gripper_name_[arm_k] = gripper_k;
+                        arm_gripper_name_[part.substr(0, colon)] = part.substr(colon + 1);
                     }
                 }
                 start = i + 1;
             }
         }
     }
+    RCLCPP_INFO(this->get_logger(), "[DataStreamer] Active arms: %d, names: [%s]",
+                n_arms_, active_arms_str.c_str());
 
-    RCLCPP_INFO(this->get_logger(), "[DataStreamer] Active arms: %d, names: [%s], gripper mapping: %s",
-                 n_arms_, active_arms_str.c_str(), arm_gripper_str.c_str());
-
-    // Build per-arm camera mapping and filter cameras for active arms
+    // Build per-arm camera mapping
     std::string per_arm_cameras_str;
     this->get_parameter("arm.per_arm_cameras", per_arm_cameras_str);
-    std::map<std::string, std::vector<std::string>> per_arm_cameras;  // arm_name -> [camera_name, ...]
+    std::map<std::string, std::vector<std::string>> per_arm_cameras;
     {
         std::string s = per_arm_cameras_str;
         size_t start = 0;
@@ -248,9 +475,7 @@ DataStreamer::DataStreamer(const rclcpp::NodeOptions& options) : Node("data_stre
                 if (!part.empty()) {
                     size_t colon = part.find(':');
                     if (colon != std::string::npos) {
-                        std::string arm_k = part.substr(0, colon);
-                        std::string cam_k = part.substr(colon + 1);
-                        per_arm_cameras[arm_k].push_back(cam_k);
+                        per_arm_cameras[part.substr(0, colon)].push_back(part.substr(colon + 1));
                     }
                 }
                 start = i + 1;
@@ -263,18 +488,9 @@ DataStreamer::DataStreamer(const rclcpp::NodeOptions& options) : Node("data_stre
         camera_name_to_global_idx[cameraColorNames_[i]] = i;
     }
 
-    // Build filtered camera list: for each arm, list of ordered buffer indices belonging to it
-    // The ordered position in ordered_per_arm_cam_names IS the ObservationBuffer index.
     std::map<std::string, std::vector<int>> arm_to_global_cam_idx;
     std::vector<std::string> ordered_per_arm_cam_names;
     for (const auto& arm_pair : per_arm_cameras) {
-        RCLCPP_INFO(this->get_logger(), "[DataStreamer] mapping arm '%s' -> cameras [%s]",
-                    arm_pair.first.c_str(),
-                    [&]() {
-                        std::ostringstream s;
-                        for (auto& c : arm_pair.second) s << c << " ";
-                        return s.str();
-                    }().c_str());
         for (const std::string& cam_name : arm_pair.second) {
             auto it = camera_name_to_global_idx.find(cam_name);
             if (it != camera_name_to_global_idx.end()) {
@@ -282,13 +498,12 @@ DataStreamer::DataStreamer(const rclcpp::NodeOptions& options) : Node("data_stre
                 arm_to_global_cam_idx[arm_pair.first].push_back(ordered_pos);
                 ordered_per_arm_cam_names.push_back(cam_name);
             } else {
-                RCLCPP_WARN(this->get_logger(), "[DataStreamer] camera '%s' not found in cameraColorNames_, skipping",
+                RCLCPP_WARN(this->get_logger(), "[DataStreamer] Camera '%s' not found in cameraColorNames_, skipping",
                             cam_name.c_str());
             }
         }
     }
 
-    // Total cameras = sum of all per-arm cameras
     int n_total_cameras = (int)ordered_per_arm_cam_names.size();
     arm_to_global_cam_idx_ = arm_to_global_cam_idx;
     ordered_per_arm_cam_names_ = ordered_per_arm_cam_names;
@@ -303,10 +518,7 @@ DataStreamer::DataStreamer(const rclcpp::NodeOptions& options) : Node("data_stre
     this->get_parameter("inference.n_obs_steps", n_obs_steps_);
     this->get_parameter("inference.camera_freq", camera_freq_);
     this->get_parameter("inference.jpeg_quality", jpeg_quality_);
-    auto_reset_ = true;
     this->get_parameter("inference.auto_reset", auto_reset_);
-    action_wait_timeout_sec_ = 30.0;
-    this->get_parameter("inference.action_wait_timeout_sec", action_wait_timeout_sec_);
     this->get_parameter("action.arm_index", action_arm_index_);
     bool action_enabled;
     this->get_parameter("action.enabled", action_enabled);
@@ -315,7 +527,6 @@ DataStreamer::DataStreamer(const rclcpp::NodeOptions& options) : Node("data_stre
     this->get_parameter("debug.enabled", debug_enabled);
     this->get_parameter("debug.dir", debug_dir_);
     debug_enabled_.store(debug_enabled);
-
     if (debug_enabled_) {
         if (!mkdirRecursive(debug_dir_)) {
             RCLCPP_WARN(this->get_logger(), "[DataStreamer] Failed to create debug dir '%s'", debug_dir_.c_str());
@@ -325,29 +536,18 @@ DataStreamer::DataStreamer(const rclcpp::NodeOptions& options) : Node("data_stre
 
     this->get_parameter("safety.enabled", safety_enabled_);
     this->get_parameter("safety.max_position_delta", safety_max_pos_delta_);
-    this->get_parameter("safety.max_gripper_delta", safety_max_gripper_delta_);
     this->get_parameter("safety.max_angle_delta", safety_max_angle_delta_);
-    this->get_parameter("safety.position_x_min", safety_pos_x_min_);
-    this->get_parameter("safety.position_x_max", safety_pos_x_max_);
-    this->get_parameter("safety.position_y_min", safety_pos_y_min_);
-    this->get_parameter("safety.position_y_max", safety_pos_y_max_);
-    this->get_parameter("safety.position_z_min", safety_pos_z_min_);
-    this->get_parameter("safety.position_z_max", safety_pos_z_max_);
     this->get_parameter("safety.publish_rate_hz", safety_publish_rate_hz_);
     this->get_parameter("safety.log_rejections", safety_log_rejections_);
-    this->get_parameter("safety.quaternion_multiply_body_frame", safety_quat_multiply_body_frame_);
     last_safe_publish_time_ = std::chrono::steady_clock::now() - std::chrono::milliseconds(100);
 
-    RCLCPP_INFO(this->get_logger(), "[DataStreamer] Safety filter: enabled=%d, max_pos_delta=%.3fm, max_gripper_delta=%.3f, rate=%.1fHz",
-                 safety_enabled_, safety_max_pos_delta_, safety_max_gripper_delta_, safety_publish_rate_hz_);
+    RCLCPP_INFO(this->get_logger(), "[DataStreamer] Safety: enabled=%d, max_pos_delta=%.3fm, angle_delta=%.3f rad, rate=%.1fHz",
+                safety_enabled_, safety_max_pos_delta_, safety_max_angle_delta_, safety_publish_rate_hz_);
 
-    if (armEndPoseOrients_.empty())
-        armEndPoseOrients_.resize(armEndPoseTopics_.size(), true);
-    if (armEndPoseOffsets_.empty())
-        armEndPoseOffsets_.resize(armEndPoseTopics_.size(), 0.0);
-
+    // ----------------------------------------------------------------
+    // 4. Connect to inference server
+    // ----------------------------------------------------------------
     RCLCPP_INFO(this->get_logger(), "[DataStreamer] Connecting to %s:%d", server_host_.c_str(), server_port_);
-
     socket_client_ = std::make_unique<SocketClient>(server_host_, server_port_);
     if (!socket_client_->connect(10.0)) {
         RCLCPP_ERROR(this->get_logger(), "[DataStreamer] Failed to connect to inference server, will retry in send loop!");
@@ -358,7 +558,10 @@ DataStreamer::DataStreamer(const rclcpp::NodeOptions& options) : Node("data_stre
     obs_buffer_ = std::make_unique<ObservationBuffer>(
         n_total_cameras, n_arms_, n_obs_steps_, inference_freq_, camera_freq_);
 
-    // Subscribe to each camera using the ordered buffer index (which matches ordered_per_arm_cam_names_)
+    // ----------------------------------------------------------------
+    // 5. Subscribe to ROS2 topics
+    // ----------------------------------------------------------------
+    // Cameras: subscribed per active arm, using ordered buffer index
     for (const auto& arm_pair : arm_to_global_cam_idx) {
         const std::string& arm_name = arm_pair.first;
         for (int ordered_idx : arm_pair.second) {
@@ -370,21 +573,19 @@ DataStreamer::DataStreamer(const rclcpp::NodeOptions& options) : Node("data_stre
                     this->cameraColorCallback(msg, ordered_idx, arm_name);
                 });
             subCameraColors_.push_back(sub);
-            RCLCPP_INFO(this->get_logger(), "[DataStreamer] Subscribed to camera (arm=%s): %s -> buf_idx=%d",
+            RCLCPP_INFO(this->get_logger(), "[DataStreamer] Camera (arm=%s): %s -> buf_idx=%d",
                         arm_name.c_str(), cameraColorTopics_[global_idx].c_str(), ordered_idx);
         }
     }
 
+    // Arm end poses (FK)
     for (const std::string& active_arm : arm_names_) {
         int topic_idx = -1;
         for (int i = 0; i < (int)armEndPoseNames_.size(); ++i) {
-            if (armEndPoseNames_[i] == active_arm) {
-                topic_idx = i;
-                break;
-            }
+            if (armEndPoseNames_[i] == active_arm) { topic_idx = i; break; }
         }
         if (topic_idx < 0 || topic_idx >= (int)armEndPoseTopics_.size()) {
-            RCLCPP_WARN(this->get_logger(), "[DataStreamer] No topic found for active arm '%s', skipping subscription", active_arm.c_str());
+            RCLCPP_WARN(this->get_logger(), "[DataStreamer] No topic found for active arm '%s', skipping", active_arm.c_str());
             continue;
         }
         auto sub = this->create_subscription<geometry_msgs::msg::PoseStamped>(
@@ -396,11 +597,11 @@ DataStreamer::DataStreamer(const rclcpp::NodeOptions& options) : Node("data_stre
                 this->armEndPoseCallback(msg, buf_idx, active_arm);
             });
         subArmEndPoses_.push_back(sub);
-        RCLCPP_INFO(this->get_logger(), "[DataStreamer] Subscribed to end pose for arm '%s' (buf_idx=%d, topic_idx=%d): %s",
-                    active_arm.c_str(), arm_name_to_buffer_idx_[active_arm], topic_idx, armEndPoseTopics_[topic_idx].c_str());
+        RCLCPP_INFO(this->get_logger(), "[DataStreamer] End pose arm '%s' (buf_idx=%d): %s",
+                    active_arm.c_str(), arm_name_to_buffer_idx_[active_arm], armEndPoseTopics_[topic_idx].c_str());
     }
 
-    // Subscribe to remote sensor poses (teleop master device) for offset-mode action
+    // Remote sensor poses (teleop master device)
     for (const auto& pair : arm_pika_pose_topic_) {
         const std::string& arm_name = pair.first;
         const std::string& topic = pair.second;
@@ -410,19 +611,18 @@ DataStreamer::DataStreamer(const rclcpp::NodeOptions& options) : Node("data_stre
                 this->pikaPoseCallback(msg, arm_name);
             });
         subPikaPoses_[arm_name] = sub;
-        RCLCPP_INFO(this->get_logger(), "[DataStreamer] Subscribed to pika_pose for arm '%s': %s (left=%d)",
-                    arm_name.c_str(), topic.c_str(), pika_pose_side_is_left_[arm_name]);
+        RCLCPP_INFO(this->get_logger(), "[DataStreamer] pika_pose arm '%s': %s", arm_name.c_str(), topic.c_str());
     }
 
-    // Subscribe to teleop_status for init_pose reset coordination
+    // Teleop status (reset init poses on teleop quit)
     auto teleop_sub = this->create_subscription<data_msgs::msg::TeleopStatus>(
         "/teleop_status", rclcpp::SystemDefaultsQoS(),
         [this](const data_msgs::msg::TeleopStatus::SharedPtr msg) {
             this->teleopStatusCallback(msg);
         });
     subTeleopStatus_ = teleop_sub;
-    RCLCPP_INFO(this->get_logger(), "[DataStreamer] Subscribed to /teleop_status");
 
+    // Gripper encoders
     for (size_t i = 0; i < gripperEncoderTopics_.size(); ++i) {
         int idx = static_cast<int>(i);
         auto sub = this->create_subscription<data_msgs::msg::Gripper>(
@@ -431,27 +631,27 @@ DataStreamer::DataStreamer(const rclcpp::NodeOptions& options) : Node("data_stre
                 this->gripperEncoderCallback(msg, idx);
             });
         subGripperEncoders_.push_back(sub);
-        RCLCPP_INFO(this->get_logger(), "[DataStreamer] Subscribed to gripper: %s", gripperEncoderTopics_[i].c_str());
+        RCLCPP_INFO(this->get_logger(), "[DataStreamer] Gripper: %s", gripperEncoderTopics_[i].c_str());
     }
 
-    // Create action publishers if enabled (use first active arm)
+    // ----------------------------------------------------------------
+    // 6. Create action publishers
+    // ----------------------------------------------------------------
     if (action_enabled && !arm_names_.empty()) {
         if (action_arm_index_ < 0 || action_arm_index_ >= (int)arm_names_.size()) {
             RCLCPP_WARN(this->get_logger(), "[DataStreamer] action.arm_index %d out of range, clamping to 0", action_arm_index_);
             action_arm_index_ = 0;
         }
         std::string arm_name = arm_names_[action_arm_index_];
-        // nero_IK index_name convention: '' (single) -> /nero_inference/action, '_r' -> /nero_inference_r/action
         std::string configured_topic;
         this->get_parameter("action.topic", configured_topic);
         std::string pose_topic;
         std::string gripper_topic;
         if (!configured_topic.empty()) {
-            // Use topic configured in yaml (e.g. "/nero_inference/action")
             pose_topic = configured_topic;
             gripper_topic = configured_topic + "_gripper";
         } else {
-            // Derive suffix from arm_name: strip "arm" prefix (keep underscore) so "arm_r" -> "_r"
+            // Derive topic suffix from arm_name: "arm_r" -> "_r" -> /nero_inference_r/action
             std::string arm_suffix = arm_name;
             if (arm_suffix.rfind("arm_", 0) == 0) {
                 arm_suffix = arm_suffix.substr(3);
@@ -459,27 +659,32 @@ DataStreamer::DataStreamer(const rclcpp::NodeOptions& options) : Node("data_stre
             pose_topic = "/nero_inference" + arm_suffix + "/action";
             gripper_topic = "/nero_inference" + arm_suffix + "/action_gripper";
         }
-
         auto pose_pub = this->create_publisher<std_msgs::msg::Float64MultiArray>(pose_topic, 1);
         action_pose_pubs_.push_back(pose_pub);
-        RCLCPP_INFO(this->get_logger(), "[DataStreamer] Created action publisher: %s", pose_topic.c_str());
-
+        RCLCPP_INFO(this->get_logger(), "[DataStreamer] Action publisher: %s", pose_topic.c_str());
         auto gripper_pub = this->create_publisher<std_msgs::msg::Float32>(gripper_topic, 1);
         action_gripper_pubs_.push_back(gripper_pub);
-        RCLCPP_INFO(this->get_logger(), "[DataStreamer] Created action gripper publisher: %s", gripper_topic.c_str());
+        RCLCPP_INFO(this->get_logger(), "[DataStreamer] Action gripper publisher: %s", gripper_topic.c_str());
     } else if (action_enabled) {
-        RCLCPP_WARN(this->get_logger(), "[DataStreamer] action.enabled=true but arm.endPose.names is empty, action publishers not created");
+        RCLCPP_WARN(this->get_logger(), "[DataStreamer] action.enabled=true but no active arms, publishers not created");
     }
 
+    // ----------------------------------------------------------------
+    // 7. Start worker threads
+    // ----------------------------------------------------------------
     running_ = true;
-
     send_thread_ = std::thread(&DataStreamer::sendLoop, this);
     recv_thread_ = std::thread(&DataStreamer::recvLoop, this);
     action_step_thread_ = std::thread(&DataStreamer::actionStepLoop, this);
 
-    RCLCPP_INFO(this->get_logger(), "[DataStreamer] Started. Observations sent: %ld, Actions received: %ld",
-                 observations_sent_.load(), actions_received_.load());
+    RCLCPP_INFO(this->get_logger(), "[DataStreamer] Started. Observations sent: %ld",
+                observations_sent_.load());
 }
+
+
+// =====================================================================
+// ROS2 callbacks
+// =====================================================================
 
 void DataStreamer::cameraColorCallback(const sensor_msgs::msg::Image::SharedPtr msg, int cam_buf_idx, const std::string& arm_name) {
     (void)arm_name;
@@ -498,38 +703,24 @@ void DataStreamer::armEndPoseCallback(const geometry_msgs::msg::PoseStamped::Sha
 
     if (arm_idx < 0 || arm_idx >= n_arms_) return;
 
+    // Lookup latest gripper value for this arm
     std::string gripper_encoder_name;
     if (arm_gripper_name_.find(arm_name) != arm_gripper_name_.end()) {
         gripper_encoder_name = arm_gripper_name_[arm_name];
     }
-
     double gripper = 1.0;
     if (!gripper_encoder_name.empty()) {
         std::lock_guard<std::mutex> lk(gripper_mutex_);
         auto it = gripper_latest_.find(gripper_encoder_name);
         if (it != gripper_latest_.end()) {
             gripper = it->second;
-        } else {
-            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
-                "[DataStreamer] armEndPoseCallback: no gripper value for '%s' (arm='%s'), defaulting to 1.0",
-                gripper_encoder_name.c_str(), arm_name.c_str());
         }
     }
 
-    // Record init pose on first arrival
-    {
-        std::lock_guard<std::mutex> lk(init_pose_mutex_);
-        if (!arm_init_pose_recorded_[arm_name]) {
-            arm_init_pose_[arm_name] = pose7;
-            arm_init_pose_recorded_[arm_name] = true;
-            RCLCPP_INFO(this->get_logger(), "[DataStreamer] Recorded init_pose for %s: [%.4f, %.4f, %.4f]",
-                        arm_name.c_str(), pose7[0], pose7[1], pose7[2]);
-        }
-    }
-
+    // Push into ring buffer for observation alignment
     obs_buffer_->addArmState(arm_idx, pose7, gripper, ts);
 
-    // Record cumulative absolute pose for safety delta checking
+    // Update cumulative pose (used for safety delta checks in checkActionSafety)
     {
         std::lock_guard<std::mutex> lk(cumulative_pose_mutex_);
         arm_cumulative_pose_[arm_name] = pose7;
@@ -541,14 +732,11 @@ void DataStreamer::pikaPoseCallback(const geometry_msgs::msg::PoseStamped::Share
     std::vector<double> pose7 = poseStampedToVec7(*msg);
 
     std::lock_guard<std::mutex> lk(pika_pose_mutex_);
-    // Record init pose on first arrival (calibration at teleop start)
     if (!pika_pose_init_recorded_[arm_name]) {
         pika_pose_init_[arm_name] = pose7;
         pika_pose_init_recorded_[arm_name] = true;
-        RCLCPP_INFO(this->get_logger(), "[DataStreamer] pika_pose init recorded for %s: pos=[%.4f, %.4f, %.4f] quat=[%.4f, %.4f, %.4f, %.4f]",
-                    arm_name.c_str(),
-                    pose7[0], pose7[1], pose7[2],
-                    pose7[3], pose7[4], pose7[5], pose7[6]);
+        RCLCPP_INFO(this->get_logger(), "[DataStreamer] pika_pose init recorded for %s: [%.4f, %.4f, %.4f]",
+                    arm_name.c_str(), pose7[0], pose7[1], pose7[2]);
     }
     pika_pose_current_[arm_name] = pose7;
 }
@@ -557,11 +745,7 @@ void DataStreamer::teleopStatusCallback(const data_msgs::msg::TeleopStatus::Shar
     // When teleop quits (not fail), reset init pose records so the next pose arrival
     // re-records them for the next teleop/inference session.
     if (msg->quit && !msg->fail) {
-        std::lock_guard<std::mutex> lk_init(init_pose_mutex_);
-        for (auto& pair : arm_init_pose_recorded_) {
-            pair.second = false;
-        }
-        std::lock_guard<std::mutex> lk_pika(pika_pose_mutex_);
+        std::lock_guard<std::mutex> lk(pika_pose_mutex_);
         for (auto& pair : pika_pose_init_recorded_) {
             pair.second = false;
         }
@@ -570,7 +754,6 @@ void DataStreamer::teleopStatusCallback(const data_msgs::msg::TeleopStatus::Shar
 }
 
 void DataStreamer::gripperEncoderCallback(const data_msgs::msg::Gripper::SharedPtr msg, int idx) {
-    (void)idx;
     double gripper_value = 0.0;
     if (msg->distance > 0.001) {
         gripper_value = std::min(0.1, msg->distance);
@@ -582,25 +765,17 @@ void DataStreamer::gripperEncoderCallback(const data_msgs::msg::Gripper::SharedP
         std::string enc_name = gripperEncoderNames_[idx];
         std::lock_guard<std::mutex> lk(gripper_mutex_);
         gripper_latest_[enc_name] = gripper_value;
-        if (!enc_name.empty() && enc_name[0] != 'g') {
-            gripper_latest_["gripper_" + enc_name] = gripper_value;
-        }
-        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 3000,
-            "[DataStreamer] gripper enc='%s' raw_dist=%.4f raw_angle=%.4f -> norm=%.4f",
-            enc_name.c_str(), msg->distance, msg->angle, gripper_value);
     }
 }
 
+
+// =====================================================================
+// Helper implementations
+// =====================================================================
+
 std::vector<double> DataStreamer::poseStampedToVec7(const geometry_msgs::msg::PoseStamped& msg) {
-    std::vector<double> pose7(7);
-    pose7[0] = msg.pose.position.x;
-    pose7[1] = msg.pose.position.y;
-    pose7[2] = msg.pose.position.z;
-    pose7[3] = msg.pose.orientation.x;
-    pose7[4] = msg.pose.orientation.y;
-    pose7[5] = msg.pose.orientation.z;
-    pose7[6] = msg.pose.orientation.w;
-    return pose7;
+    return {msg.pose.position.x, msg.pose.position.y, msg.pose.position.z,
+            msg.pose.orientation.x, msg.pose.orientation.y, msg.pose.orientation.z, msg.pose.orientation.w};
 }
 
 std::string DataStreamer::matToBase64Jpeg(const cv::Mat& img, int quality) {
@@ -615,188 +790,155 @@ std::string DataStreamer::matToBase64Jpeg(const cv::Mat& img, int quality) {
     if (cv::imencode(".jpg", rgb, buf, params)) {
         return base64Encode(buf.data(), buf.size());
     }
-    RCLCPP_WARN_ONCE(this->get_logger(), "[DataStreamer] cv::imencode failed for image (channels=%d, size=%dx%d)",
+    RCLCPP_WARN_ONCE(this->get_logger(), "[DataStreamer] cv::imencode failed (channels=%d, size=%dx%d)",
                      img.channels(), img.cols, img.rows);
     return {};
 }
 
-bool DataStreamer::checkActionSafety(const std::vector<double>& action, int arm_idx) {
+
+// =====================================================================
+// Safety filter
+// =====================================================================
+
+bool DataStreamer::checkActionSafety(const std::vector<double>& action, int arm_idx, const std::string& arm_name,
+                                   const std::vector<double>& current_pose, double current_gripper) {
     if (!safety_enabled_) return true;
     if (action.empty()) return false;
 
     auto now = std::chrono::steady_clock::now();
     double min_interval = 1.0 / safety_publish_rate_hz_;
     if (std::chrono::duration<double>(now - last_safe_publish_time_).count() < min_interval) {
-        if (safety_log_rejections_) {
-            RCLCPP_DEBUG_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-                "[Safety] Rate limit: skipping publish (rate=%.1fHz)", safety_publish_rate_hz_);
-        }
+        RCLCPP_DEBUG_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+            "[Safety] Rate limit: skipping (rate=%.1fHz)", safety_publish_rate_hz_);
         return false;
-    }
-
-    // Retrieve current cumulative pose for this arm
-    std::vector<double> current_pose;
-    double current_gripper = 1.0;
-    std::string arm_name;
-    if (arm_idx >= 0 && arm_idx < static_cast<int>(arm_names_.size())) {
-        arm_name = arm_names_[arm_idx];
-    }
-    {
-        std::lock_guard<std::mutex> lk(cumulative_pose_mutex_);
-        auto it = arm_cumulative_pose_.find(arm_name);
-        if (it != arm_cumulative_pose_.end()) {
-            current_pose = it->second;
-        }
-        auto it_g = arm_cumulative_gripper_.find(arm_name);
-        if (it_g != arm_cumulative_gripper_.end()) {
-            current_gripper = it_g->second;
-        }
     }
 
     if (current_pose.size() != 7) {
         RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-            "[Safety] No cumulative pose for arm '%s' yet, skipping publish", arm_name.c_str());
+            "[Safety] No pose for arm '%s' yet, skipping publish", arm_name.c_str());
         return false;
     }
 
-    // Compute position delta: action target - current pose
+    // Position delta check
     double dx = action[0] - current_pose[0];
     double dy = action[1] - current_pose[1];
     double dz = action[2] - current_pose[2];
     double pos_delta = std::sqrt(dx*dx + dy*dy + dz*dz);
     if (pos_delta > safety_max_pos_delta_) {
-        if (safety_log_rejections_) {
-            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-                "[Safety] Rejected: pos delta %.3fm > %.3fm (target=[%.4f, %.4f, %.4f] vs current=[%.4f, %.4f, %.4f])",
-                pos_delta, safety_max_pos_delta_,
-                action[0], action[1], action[2],
-                current_pose[0], current_pose[1], current_pose[2]);
-        }
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+            "[Safety] Rejected: pos delta %.3fm > %.3fm", pos_delta, safety_max_pos_delta_);
         return false;
     }
 
+    // Orientation delta check (quaternion)
     if (action.size() >= 7) {
-        // Action quaternion is a local delta; q_norm checks unit length, angle_delta checks rotation magnitude.
         double cx = current_pose[3], cy = current_pose[4], cz = current_pose[5], cw = current_pose[6];
         double ax = action[3], ay = action[4], az = action[5], aw = action[6];
         double q_norm = std::sqrt(ax*ax + ay*ay + az*az + aw*aw);
         if (std::abs(q_norm - 1.0) > 0.1) {
-            if (safety_log_rejections_) {
-                RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-                    "[Safety] Rejected: quaternion normalization error %.4f (norm=%.4f)", std::abs(q_norm - 1.0), q_norm);
-            }
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+                "[Safety] Rejected: quaternion norm error %.4f", std::abs(q_norm - 1.0));
             return false;
         }
         double dot = cx*ax + cy*ay + cz*az + cw*aw;
         double angle_delta = 2.0 * std::acos(std::max(-1.0, std::min(1.0, std::abs(dot))));
         if (angle_delta > safety_max_angle_delta_) {
-            if (safety_log_rejections_) {
-                RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-                    "[Safety] Rejected: quaternion angle delta %.3f rad > %.3f rad", angle_delta, safety_max_angle_delta_);
-            }
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+                "[Safety] Rejected: angle delta %.3f rad > %.3f rad", angle_delta, safety_max_angle_delta_);
             return false;
         }
     }
 
+    // Gripper range check
     double gripper_val = (action.size() >= 8) ? action[7] : current_gripper;
     if (gripper_val < 0.0 || gripper_val > 0.1) {
-        if (safety_log_rejections_) {
-            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-                "[Safety] Rejected: gripper value %.3f out of [0,0.1] range", gripper_val);
-        }
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+            "[Safety] Rejected: gripper %.3f out of [0,0.1]", gripper_val);
         return false;
     }
 
-    {
-        std::lock_guard<std::mutex> lk(safety_mutex_);
-        last_safe_action_ = action;
-        last_safe_publish_time_ = now;
-    }
+    last_safe_publish_time_ = now;
     return true;
 }
 
+
+// =====================================================================
+// Action publishing
+// =====================================================================
+
 bool DataStreamer::publishAction(const std::vector<std::vector<double>>& actions) {
-        if (actions.empty() || action_pose_pubs_.empty()) return false;
+    if (actions.empty() || action_pose_pubs_.empty()) return false;
 
-        bool any_published = false;
+    bool any_published = false;
+    for (size_t arm_idx = 0; arm_idx < actions.size() && arm_idx < action_pose_pubs_.size(); ++arm_idx) {
+        const std::vector<double>& action = actions[arm_idx];
+        if (action.empty()) continue;
 
-        for (size_t arm_idx = 0; arm_idx < actions.size() && arm_idx < action_pose_pubs_.size(); ++arm_idx) {
-            const std::vector<double>& action = actions[arm_idx];
-            if (action.empty()) continue;
-
-            if (!checkActionSafety(action, arm_idx)) continue;
-
-            std::string arm_name;
-            if (arm_idx < arm_names_.size()) {
-                arm_name = arm_names_[arm_idx];
-            }
-
-            // Get current gripper value for fallback
-            double current_gripper = 1.0;
-            {
-                std::lock_guard<std::mutex> lk(cumulative_pose_mutex_);
-                auto it_g = arm_cumulative_gripper_.find(arm_name);
-                if (it_g != arm_cumulative_gripper_.end()) {
-                    current_gripper = it_g->second;
-                }
-            }
-
-            std::string arm_init_str = "[not recorded]";
-            std::string sensor_delta_str = "[no data]";
-            {
-                std::lock_guard<std::mutex> lk(init_pose_mutex_);
-                auto it = arm_init_pose_.find(arm_name);
-                if (it != arm_init_pose_.end() && it->second.size() == 7) {
-                    char buf[128];
-                    snprintf(buf, sizeof(buf), "[%.4f, %.4f, %.4f]",
-                             it->second[0], it->second[1], it->second[2]);
-                    arm_init_str = buf;
-                }
-            }
-            {
-                std::lock_guard<std::mutex> lk(pika_pose_mutex_);
-                auto it_init = pika_pose_init_.find(arm_name);
-                auto it_curr = pika_pose_current_.find(arm_name);
-                if (it_init != pika_pose_init_.end() && it_curr != pika_pose_current_.end() &&
-                    it_init->second.size() == 7 && it_curr->second.size() == 7) {
-                    char buf[128];
-                    snprintf(buf, sizeof(buf), "[%.4f, %.4f, %.4f]",
-                             it_curr->second[0] - it_init->second[0],
-                             it_curr->second[1] - it_init->second[1],
-                             it_curr->second[2] - it_init->second[2]);
-                    sensor_delta_str = buf;
-                }
-            }
-
-            std_msgs::msg::Float64MultiArray action_msg;
-            action_msg.data = action;
-            action_pose_pubs_[arm_idx]->publish(action_msg);
-
-            // Publish gripper action separately (Float32)
-            // Use action[7] if available, otherwise maintain current gripper position
-            if (arm_idx < action_gripper_pubs_.size()) {
-                double gripper_value = current_gripper;
-                if (action.size() >= 8) {
-                    gripper_value = action[7];
-                }
-                std_msgs::msg::Float32 gripper_msg;
-                gripper_msg.data = static_cast<float>(gripper_value);
-                action_gripper_pubs_[arm_idx]->publish(gripper_msg);
-                RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-                    "[DataStreamer] Gripper action published arm[%s]: %.4f (from %s)",
-                    arm_name.c_str(), gripper_msg.data,
-                    (action.size() >= 8) ? "action[7]" : "current_gripper");
-            }
-
-            RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-                "[DataStreamer] Action published arm[%s]: delta=[%.4f, %.4f, %.4f], "
-                "arm_init=%s, sensor_delta=%s",
-                arm_name.c_str(), action[0], action[1], action[2],
-                arm_init_str.c_str(), sensor_delta_str.c_str());
-            any_published = true;
+        // Retrieve FK pose + gripper (for logging) and check safety
+        std::vector<double> current_pose;
+        double current_gripper = 1.0;
+        std::string arm_name;
+        if (arm_idx < (int)arm_names_.size()) {
+            arm_name = arm_names_[arm_idx];
         }
+        {
+            std::lock_guard<std::mutex> lk(cumulative_pose_mutex_);
+            auto it_pose = arm_cumulative_pose_.find(arm_name);
+            if (it_pose != arm_cumulative_pose_.end()) {
+                current_pose = it_pose->second;
+            }
+            auto it_g = arm_cumulative_gripper_.find(arm_name);
+            if (it_g != arm_cumulative_gripper_.end()) {
+                current_gripper = it_g->second;
+            }
+        }
+
+        if (!checkActionSafety(action, arm_idx, arm_name, current_pose, current_gripper)) continue;
+
+        // Publish pose action
+        std_msgs::msg::Float64MultiArray action_msg;
+        action_msg.data = action;
+
+        // DEBUG: log FK pose vs action vs published value
+        RCLCPP_WARN(this->get_logger(),
+            "[DataStreamer] >>> PUBLISH arm[%s] | "
+            "FK=[%.4f, %.4f, %.4f] | "
+            "action=[%.4f, %.4f, %.4f, w=%.4f, gripper=%.4f]",
+            arm_name.c_str(),
+            current_pose.size() >= 3 ? current_pose[0] : 0.0,
+            current_pose.size() >= 3 ? current_pose[1] : 0.0,
+            current_pose.size() >= 3 ? current_pose[2] : 0.0,
+            action[0], action[1], action[2],
+            action.size() >= 7 ? action[6] : 0.0,
+            action.size() >= 8 ? action[7] : -1.0);
+
+        action_pose_pubs_[arm_idx]->publish(action_msg);
+
+        // Publish gripper action (Float32). Falls back to current position if action[7] absent.
+        if (arm_idx < action_gripper_pubs_.size()) {
+            double gripper_value = (action.size() >= 8) ? action[7] : current_gripper;
+            std_msgs::msg::Float32 gripper_msg;
+            gripper_msg.data = static_cast<float>(gripper_value);
+            action_gripper_pubs_[arm_idx]->publish(gripper_msg);
+            RCLCPP_DEBUG_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+                "[DataStreamer] Gripper arm[%s]: %.4f", arm_name.c_str(), gripper_msg.data);
+        }
+
+        RCLCPP_DEBUG_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+            "[DataStreamer] Action arm[%s]: [%.4f, %.4f, %.4f]",
+            arm_name.c_str(), action[0], action[1], action[2]);
+        any_published = true;
+    }
     return any_published;
 }
+
+
+// =====================================================================
+// sendLoop — observation producer
+// =====================================================================
+// Sends a JSON observation to the inference server every cycle,
+// then blocks on the pipeline CV until the action sequence completes.
+// Pipeline: send obs -> recv action -> execute steps -> wait convergence -> next cycle
 
 void DataStreamer::sendLoop() {
     double dt = 1.0 / inference_freq_;
@@ -805,7 +947,7 @@ void DataStreamer::sendLoop() {
     RCLCPP_INFO(this->get_logger(), "[DataStreamer] Waiting for observation buffer to fill...");
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-    RCLCPP_INFO(this->get_logger(), "[DataStreamer] Starting serialized pipeline: reset -> (observation -> action -> execute -> observation -> ...)");
+    RCLCPP_INFO(this->get_logger(), "[DataStreamer] Pipeline: reset -> (obs -> action -> execute -> obs -> ...)");
 
     bool first_cycle = true;
     while (rclcpp::ok() && running_) {
@@ -813,11 +955,9 @@ void DataStreamer::sendLoop() {
 
         if (!socket_client_->isConnected()) {
             RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
-                "[DataStreamer] Not connected to server, attempting reconnect...");
+                "[DataStreamer] Not connected, attempting reconnect...");
             if (socket_client_->reconnectAttempts() >= SocketClient::maxReconnectAttempts()) {
-                RCLCPP_ERROR(this->get_logger(),
-                    "[DataStreamer] Max reconnect attempts (%d) reached, giving up.",
-                    SocketClient::maxReconnectAttempts());
+                RCLCPP_ERROR(this->get_logger(), "[DataStreamer] Max reconnect attempts reached, giving up.");
                 break;
             }
             if (!socket_client_->reconnect(5.0)) {
@@ -830,7 +970,7 @@ void DataStreamer::sendLoop() {
             first_cycle = true;
         }
 
-        // Reset once at the very beginning or after reconnect
+        // Send initial reset on first cycle or after reconnect
         if (auto_reset_ && first_cycle) {
             RCLCPP_INFO(this->get_logger(), "[DataStreamer] Sending initial reset...");
             if (!sendReset()) {
@@ -841,18 +981,18 @@ void DataStreamer::sendLoop() {
             first_cycle = false;
         }
 
+        // Wait until observation buffer has enough aligned samples
         ObservationBuffer::AlignedObs obs;
         if (!obs_buffer_->getAlignedObs(obs)) {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
             continue;
         }
 
+        // Build JSON observation message, grouped by arm
         Json::Value msg;
         msg["type"] = "observation";
         msg["send_timestamp"] = (double)std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::system_clock::now().time_since_epoch()).count() / 1e9;
-
-        // Per-arm structured output: images, poses, grippers, init_pose grouped by arm
 
         for (const std::string& arm_name : arm_names_) {
             auto it_arm_buf = arm_name_to_buffer_idx_.find(arm_name);
@@ -861,6 +1001,8 @@ void DataStreamer::sendLoop() {
                 continue;
             }
             int buf_idx = it_arm_buf->second;
+
+            // Images for this arm's cameras
             Json::Value images_arr = Json::arrayValue;
             for (int ordered_cam_pos = 0; ordered_cam_pos < (int)ordered_per_arm_cam_names_.size(); ++ordered_cam_pos) {
                 bool belongs = false;
@@ -879,7 +1021,7 @@ void DataStreamer::sendLoop() {
                 }
             }
 
-            // Collect poses/grippers for this arm
+            // Poses and grippers
             Json::Value poses_arr = Json::arrayValue;
             Json::Value grippers_arr = Json::arrayValue;
             for (int t = 0; t < n_obs_steps_; ++t) {
@@ -894,9 +1036,7 @@ void DataStreamer::sendLoop() {
                 }
             }
 
-            // Cumulative current pose: real-time FK arm pose, updated every callback.
-            // Used by the inference server as the base reference for action deltas.
-            // (Previously this was arm_init_pose_ which only recorded the very first pose.)
+            // Current FK pose (real-time, used by inference server as action base reference)
             Json::Value current_pose_val;
             {
                 std::lock_guard<std::mutex> lk(cumulative_pose_mutex_);
@@ -904,7 +1044,6 @@ void DataStreamer::sendLoop() {
                 if (it_cp != arm_cumulative_pose_.end()) {
                     for (double v : it_cp->second) current_pose_val.append(v);
                 }
-                // else leave as Json::nullValue
             }
 
             Json::Value arm_data;
@@ -917,12 +1056,14 @@ void DataStreamer::sendLoop() {
             msg[arm_name] = std::move(arm_data);
         }
 
+        // Send observation
         if (socket_client_->sendJson(msg)) {
             int64_t count = observations_sent_.load();
             observations_sent_.store(count + 1);
-            RCLCPP_INFO(this->get_logger(), "[DataStreamer] Observation #%ld sent (n_obs=%d, active_arms=%d, imgs=%zu), waiting for action...",
-                         count + 1, n_obs_steps_, (int)arm_names_.size(), obs.images.size());
+            RCLCPP_INFO(this->get_logger(), "[DataStreamer] Obs #%ld sent (n_obs=%d, arms=%d, imgs=%zu), waiting for action...",
+                        count + 1, n_obs_steps_, (int)arm_names_.size(), obs.images.size());
 
+            // Debug frame save (async, non-blocking)
             if (debug_enabled_.load()) {
                 int idx = debug_frame_idx_.fetch_add(1);
                 std::vector<std::string> cam_names_copy = ordered_per_arm_cam_names_;
@@ -931,7 +1072,8 @@ void DataStreamer::sendLoop() {
                 int n_arms_copy = obs_buffer_->n_arms();
                 Json::Value msg_copy = msg;
                 std::thread([msg_copy, obs_copy = obs, cam_names_copy, arm_names_copy, n_obs_copy, n_arms_copy, idx, this]() {
-                    saveDebugFrame(debug_dir_, idx, obs_copy.images, cam_names_copy, n_obs_copy, n_arms_copy, arm_names_copy, obs_copy.poses, obs_copy.grippers, msg_copy);
+                    saveDebugFrame(debug_dir_, idx, obs_copy.images, cam_names_copy, n_obs_copy, n_arms_copy,
+                                   arm_names_copy, obs_copy.poses, obs_copy.grippers, msg_copy);
                 }).detach();
             }
         } else {
@@ -942,22 +1084,17 @@ void DataStreamer::sendLoop() {
             continue;
         }
 
-        // Signal recvLoop that we are now waiting for an action response
+        // Signal recvLoop and block until action pipeline completes
         {
             std::lock_guard<std::mutex> lk(pipeline_mutex_);
             waiting_for_action_ = true;
-            obs_sent_timestamp_ = (double)std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::system_clock::now().time_since_epoch()).count() / 1e9;
         }
         pipeline_cv_.notify_one();
 
-        // Wait for action sequence to complete (recvLoop/actionStepLoop will set waiting_for_action_=false)
         {
             std::unique_lock<std::mutex> lk(pipeline_mutex_);
             pipeline_cv_.wait(lk, [this]() { return !running_ || !waiting_for_action_; });
-
             if (!running_) break;
-
             RCLCPP_INFO(this->get_logger(), "[DataStreamer] Action sequence completed, ready for next cycle.");
         }
         first_cycle = false;
@@ -971,10 +1108,15 @@ void DataStreamer::sendLoop() {
     }
 }
 
+
+// =====================================================================
+// waitForExecutionComplete — poll FK convergence
+// =====================================================================
+
 void DataStreamer::waitForExecutionComplete() {
-    const double kPosThreshold = 0.01;   // 1cm position convergence threshold
-    const double kQuatThreshold = 0.02;   // ~1.1deg orientation convergence threshold
-    const double kMaxWaitSec = 5.0;      // max time to wait for convergence
+    const double kPosThreshold = 0.01;   // 1cm
+    const double kQuatThreshold = 0.02; // ~1.1deg
+    const double kMaxWaitSec = 5.0;
 
     std::vector<std::vector<double>> target_poses;
     {
@@ -983,7 +1125,7 @@ void DataStreamer::waitForExecutionComplete() {
     }
 
     if (target_poses.empty()) {
-        RCLCPP_WARN(this->get_logger(), "[DataStreamer] waitForExecutionComplete: no target poses recorded, skipping wait");
+        RCLCPP_WARN(this->get_logger(), "[DataStreamer] waitForExecutionComplete: no target poses recorded, skipping");
         return;
     }
 
@@ -992,7 +1134,6 @@ void DataStreamer::waitForExecutionComplete() {
 
     while (rclcpp::ok() && running_ && std::chrono::steady_clock::now() < deadline) {
         bool all_converged = true;
-
         {
             std::lock_guard<std::mutex> lk(cumulative_pose_mutex_);
             for (size_t i = 0; i < arm_names_.size() && i < target_poses.size(); ++i) {
@@ -1007,13 +1148,11 @@ void DataStreamer::waitForExecutionComplete() {
                 }
                 const auto& curr = it_curr->second;
 
-                // Position convergence
                 double dx = curr[0] - target[0];
                 double dy = curr[1] - target[1];
                 double dz = curr[2] - target[2];
                 double pos_err = std::sqrt(dx*dx + dy*dy + dz*dz);
 
-                // Orientation convergence (dot product of quaternions)
                 double dot = std::abs(curr[3]*target[3] + curr[4]*target[4]
                                     + curr[5]*target[5] + curr[6]*target[6]);
                 double angle_err = 2.0 * std::acos(std::min(1.0, dot));
@@ -1027,15 +1166,22 @@ void DataStreamer::waitForExecutionComplete() {
 
         if (all_converged) {
             RCLCPP_INFO(this->get_logger(), "[DataStreamer] Execution converged: pos_err<%.2fcm, angle_err<%.1fdeg",
-                kPosThreshold * 100, kQuatThreshold * 180.0 / M_PI);
+                        kPosThreshold * 100, kQuatThreshold * 180.0 / M_PI);
             return;
         }
-
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 
     RCLCPP_WARN(this->get_logger(), "[DataStreamer] Execution wait timeout (%.1fs), proceeding anyway", kMaxWaitSec);
 }
+
+
+// =====================================================================
+// actionStepLoop — action executor
+// =====================================================================
+// Runs at inference_freq. Each tick publishes one step from the pending
+// multi-step sequence. When all steps are published, waits for FK pose
+// convergence before notifying sendLoop to continue.
 
 void DataStreamer::actionStepLoop() {
     double dt = 1.0 / inference_freq_;
@@ -1043,9 +1189,9 @@ void DataStreamer::actionStepLoop() {
 
     while (rclcpp::ok() && running_) {
         auto loop_start = std::chrono::steady_clock::now();
-
         bool sequence_done = false;
         int completed_steps = 0;
+
         {
             std::lock_guard<std::mutex> lk(action_mutex_);
             if (!pending_actions_.empty() && action_sequence_index_ < action_sequence_steps_total_) {
@@ -1067,9 +1213,10 @@ void DataStreamer::actionStepLoop() {
                     }
                 }
                 action_sequence_index_++;
+
                 if (action_sequence_index_ >= action_sequence_steps_total_) {
                     completed_steps = action_sequence_steps_total_;
-                    // Record FK pose at the last published step as the execution target
+                    // Record FK pose at the last step as convergence target
                     {
                         std::lock_guard<std::mutex> lk(exec_target_mutex_);
                         exec_target_poses_.clear();
@@ -1085,35 +1232,31 @@ void DataStreamer::actionStepLoop() {
                     action_sequence_in_progress_ = false;
                     action_sequence_steps_total_ = 0;
                     sequence_done = true;
+
                     if (!action_sequence_any_published_) {
                         RCLCPP_WARN(this->get_logger(),
-                            "[DataStreamer] ActionStep: sequence complete but NO steps were published "
-                            "(all %d steps were safety-rejected). Aborting sequence.",
-                            completed_steps);
-                        // Notify sendLoop so it can reconnect/reset instead of continuing
+                                    "[DataStreamer] ActionStep: all %d steps safety-rejected, aborting sequence",
+                                    completed_steps);
                         waiting_for_action_ = false;
-                    } else {
-                        RCLCPP_DEBUG_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-                            "[DataStreamer] ActionStep: sequence complete, %d steps published",
-                            completed_steps);
                     }
                     action_sequence_any_published_ = false;
                 }
             }
         }
 
-        // Signal sendLoop when the entire action sequence is done AND robot has executed it
+        // Signal sendLoop when the entire sequence is done
         if (sequence_done) {
             if (action_sequence_any_published_) {
-                // Wait for FK pose to converge to the last action target
-                // before sending the next observation
-                RCLCPP_INFO(this->get_logger(), "[DataStreamer] ActionStep: all %d steps published, waiting for execution to complete...", completed_steps);
+                RCLCPP_INFO(this->get_logger(), "[DataStreamer] ActionStep: all %d steps published, waiting for execution...",
+                            completed_steps);
                 waitForExecutionComplete();
             }
-            std::lock_guard<std::mutex> lk(pipeline_mutex_);
-            waiting_for_action_ = false;
+            {
+                std::lock_guard<std::mutex> lk(pipeline_mutex_);
+                waiting_for_action_ = false;
+            }
             pipeline_cv_.notify_one();
-            RCLCPP_INFO(this->get_logger(), "[DataStreamer] ActionStep: notified pipeline, waiting_for_action_=false");
+            RCLCPP_DEBUG(this->get_logger(), "[DataStreamer] ActionStep: pipeline notified, waiting_for_action_=false");
         }
 
         auto elapsed = std::chrono::steady_clock::now() - loop_start;
@@ -1126,6 +1269,14 @@ void DataStreamer::actionStepLoop() {
     }
 }
 
+
+// =====================================================================
+// recvLoop — action consumer
+// =====================================================================
+// Receives JSON responses from the inference server over TCP.
+// Parses "action" messages into per-arm multi-step sequences and
+// hands them off to actionStepLoop via pending_actions_.
+
 void DataStreamer::recvLoop() {
     while (rclcpp::ok() && running_) {
         if (!socket_client_->isConnected()) {
@@ -1133,7 +1284,7 @@ void DataStreamer::recvLoop() {
             continue;
         }
 
-        // Block until sendLoop signals that an observation was sent and we are waiting for action.
+        // Block until sendLoop has sent an observation and is waiting for action
         constexpr double RECV_TIMEOUT_SEC = 2.0;
         {
             std::unique_lock<std::mutex> lk(pipeline_mutex_);
@@ -1141,11 +1292,9 @@ void DataStreamer::recvLoop() {
             if (!running_) break;
         }
 
-        RCLCPP_INFO(this->get_logger(), "[DataStreamer] recvLoop: waiting_for_action_=true, start receiving action...");
+        RCLCPP_INFO(this->get_logger(), "[DataStreamer] recvLoop: waiting for action...");
 
-        // Receive loop: keep recvJson until action is received or disconnected
         while (rclcpp::ok() && running_) {
-            // Check if action sequence is already done
             {
                 std::lock_guard<std::mutex> lk(pipeline_mutex_);
                 if (!waiting_for_action_) break;
@@ -1156,26 +1305,19 @@ void DataStreamer::recvLoop() {
                 static int timeout_count = 0;
                 if (++timeout_count % 5 == 1) {
                     RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
-                        "[DataStreamer] recvLoop: recvJson timeout #%d (still waiting for action)", timeout_count);
+                        "[DataStreamer] recvLoop: recvJson timeout #%d", timeout_count);
                 }
                 continue;
             }
 
             std::string type = resp.get("type", "").asString();
-            {
-                Json::FastWriter writer;
-                std::string raw = writer.write(resp);
-                if (raw.size() > 500) raw.resize(500);
-                RCLCPP_INFO(this->get_logger(), "[DataStreamer] recvLoop: received JSON type='%s': %.500s",
-                    type.c_str(), raw.c_str());
-            }
+            RCLCPP_DEBUG(this->get_logger(), "[DataStreamer] recvLoop: type='%s'", type.c_str());
 
             if (type == "action") {
                 std::vector<std::vector<std::vector<double>>> actions;
                 actions.resize(arm_names_.size());
-
                 bool has_any_action = false;
-                RCLCPP_INFO(this->get_logger(), "[DataStreamer] Parsing action, arm_names_ size=%zu", arm_names_.size());
+
                 for (size_t i = 0; i < arm_names_.size(); ++i) {
                     std::string arm_name = arm_names_[i];
                     if (arm_name.rfind("arm_", 0) == 0) {
@@ -1183,8 +1325,6 @@ void DataStreamer::recvLoop() {
                     }
                     std::string key = "action_" + arm_name;
                     Json::Value arm_steps = resp[key];
-                    RCLCPP_INFO(this->get_logger(), "[DataStreamer]   key='%s' isArray=%d size=%u",
-                        key.c_str(), (int)arm_steps.isArray(), arm_steps.size());
                     if (arm_steps.isArray() && !arm_steps.empty()) {
                         std::vector<std::vector<double>> arm_seq;
                         for (Json::ArrayIndex s = 0; s < arm_steps.size(); ++s) {
@@ -1200,23 +1340,21 @@ void DataStreamer::recvLoop() {
                         }
                         actions[i] = std::move(arm_seq);
                         has_any_action = true;
-                        RCLCPP_INFO(this->get_logger(), "[DataStreamer]   arm[%zu] parsed %zu steps, first step dim=%zu",
-                            i, actions[i].size(), actions[i][0].size());
+                        RCLCPP_DEBUG(this->get_logger(), "[DataStreamer] arm[%zu] parsed %zu steps",
+                                     i, actions[i].size());
                     }
                 }
 
                 if (!has_any_action) {
                     RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
-                        "[DataStreamer] No action parsed from JSON. arm_names_=%zu",
-                        arm_names_.size());
+                        "[DataStreamer] No action parsed from JSON");
                 }
 
                 if (has_any_action) {
                     std::lock_guard<std::mutex> lk(action_mutex_);
                     if (action_sequence_in_progress_) {
                         RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 3000,
-                            "[DataStreamer] Dropping new action: previous sequence (%d steps, at step %d) still in progress",
-                            action_sequence_steps_total_, action_sequence_index_);
+                            "[DataStreamer] Dropping new action: previous sequence still in progress");
                     } else {
                         pending_actions_ = actions;
                         action_sequence_index_ = 0;
@@ -1225,35 +1363,33 @@ void DataStreamer::recvLoop() {
                             action_sequence_steps_total_ = std::max(action_sequence_steps_total_, (int)seq.size());
                         }
                         action_sequence_in_progress_ = true;
-
                         RCLCPP_INFO(this->get_logger(),
-                                    "[DataStreamer] Action received: %d arms, %d steps total, actionStepLoop will publish all steps...",
+                                    "[DataStreamer] Action received: %d arms, %d steps",
                                     (int)actions.size(), action_sequence_steps_total_);
                     }
                 }
             } else if (type == "reset_ack") {
-                RCLCPP_INFO(this->get_logger(), "[DataStreamer] reset_ack received (already handled in sendLoop)");
+                RCLCPP_DEBUG(this->get_logger(), "[DataStreamer] reset_ack received");
             } else if (!type.empty()) {
                 RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
                     "[DataStreamer] Unknown message type: %s", type.c_str());
             }
-        }  // end inner while
-    }  // end outer while
+        }
+    }
 }
+
+
+// =====================================================================
+// Destructor & sendReset
+// =====================================================================
 
 DataStreamer::~DataStreamer() {
     running_ = false;
-    // Unblock any thread waiting on the pipeline or handshake CVs
     {
         std::lock_guard<std::mutex> lk(pipeline_mutex_);
         waiting_for_action_ = false;
     }
     pipeline_cv_.notify_all();
-    {
-        std::lock_guard<std::mutex> lk(handshake_mutex_);
-        handshake_received_ = true;
-    }
-    handshake_cv_.notify_all();
     if (send_thread_.joinable()) send_thread_.join();
     if (recv_thread_.joinable()) recv_thread_.join();
     if (action_step_thread_.joinable()) action_step_thread_.join();
@@ -1271,6 +1407,11 @@ bool DataStreamer::sendReset() {
     }
     return false;
 }
+
+
+// =====================================================================
+// main
+// =====================================================================
 
 int main(int argc, char** argv) {
     rclcpp::init(argc, argv);

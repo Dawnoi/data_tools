@@ -1,3 +1,4 @@
+# DataStreamer configuration
 /**:
   ros__parameters:
     server:
@@ -15,9 +16,9 @@
       enabled: true
       dir: "/home/yxgn/data_streamer_debug"
       # RGB相机
-      camera_names: "gripperCamera_l"
+      # camera_names: "gripperCamera_l"
       # 鱼眼相机
-      # camera_names: "gripperFisheye_l"
+      camera_names: "gripperFisheye_r"
       arm_names: "arm_l,arm_r"
       gripper_names: "gripper_l,gripper_r"
 
@@ -52,11 +53,11 @@
         width: 1280
         height: 720
         # RGB相机
-        topics: ['/camera_l/color/image_raw', '/camera_r/color/image_raw']
-        names: ['gripperCamera_l', 'gripperCamera_r']
+        # topics: ['/camera_l/color/image_raw', '/camera_r/color/image_raw']
+        # names: ['gripperCamera_l', 'gripperCamera_r']
         # 鱼眼相机
-        # topics: ['/camera_fisheye_l/color/image_raw', '/camera_fisheye_r/color/image_raw']
-        # names: ['gripperFisheye_l', 'gripperFisheye_r']
+        topics: ['/camera_fisheye_l/color/image_raw', '/camera_fisheye_r/color/image_raw']
+        names: ['gripperFisheye_l', 'gripperFisheye_r']
 
     arm:
       endPose:
@@ -80,10 +81,10 @@
       # active_arm_camera_names: "arm_r:gripperCamera_r"
       # per_arm_cameras: "arm_r:gripperCamera_r"
       # 右臂单独采集 鱼眼相机
-      # active_arms: "arm_r"
-      # active_arm_gripper_names: "arm_r:gripper_r"
-      # active_arm_camera_names: "arm_r:gripperFisheye_r"
-      # per_arm_cameras: "arm_r:gripperFisheye_r"
+      active_arms: "arm_r"
+      active_arm_gripper_names: "arm_r:gripper_r"
+      active_arm_camera_names: "arm_r:gripperFisheye_r"
+      per_arm_cameras: "arm_r:gripperFisheye_r"
       # 左臂单独采集 RGB相机
       # active_arms: "arm_l"
       # active_arm_gripper_names: "arm_l:gripper_l"
@@ -94,10 +95,7 @@
       # active_arm_gripper_names: "arm_l:gripper_l"
       # active_arm_camera_names: "arm_l:gripperFisheye_l"
       # per_arm_cameras: "arm_l:gripperFisheye_l"
-      active_arms: "arm_l"
-      active_arm_gripper_names: "arm_l:gripper_l"
-      active_arm_camera_names: "arm_l:gripperCamera_l"
-      per_arm_cameras: "arm_l:gripperCamera_l"
+
       # Remote sensor poses (teleop master device)
       remote_pose:
         topics: ['/pika_pose_r', '/pika_pose_l']

@@ -1,0 +1,236 @@
+#!/usr/bin/env python3
+"""
+Inference Action Capture Node
+
+订阅 inference 链路上的所有关键话题，记录每次 inference 周期的完整数据到本地 JSON，
+用于数据对比和调试。
+
+记录的字段：
+  - inference_action:    Float64MultiArray [dx, dy, dz, dqx, dqy, dqz, dqw, gripper]
+  - inference_gripper:   Float32 gripper value
+  - arm_current_pose:    机械臂末端当前 FK 位姿 [x, y, z, qx, qy, qz, qw]
+  - timestamp:           ROS 时间戳
+  - sequence_idx:        递增序号
+
+用法：
+  # 单臂（空 index_name）
+  ros2 run data_tools inference_action_capture
+
+  # 左臂
+  ros2 run data_tools inference_action_capture --ros-args -p index_name:=_l
+
+  # 右臂
+  ros2 run data_tools inference_action_capture --ros-args -p index_name:=_r
+
+  # 指定输出目录
+  ros2 run data_tools inference_action_capture --ros-args -p output_dir:=/path/to/save
+
+  # 静默模式（减少日志）
+  ros2 run data_tools inference_action_capture --ros-args -p verbose:=false
+"""
+
+import argparse
+import json
+import os
+import signal
+import sys
+import time
+import threading
+import rclpy
+from rclpy.node import Node
+from geometry_msgs.msg import PoseStamped
+from std_msgs.msg import Float32, Float64MultiArray
+
+
+class InferenceActionCapture(Node):
+    def __init__(self, args):
+        super().__init__('inference_action_capture')
+
+        self.declare_parameter('index_name', '')
+        self.declare_parameter('output_dir', '/home/yxgn/inference_capture')
+        self.declare_parameter('verbose', True)
+        self.declare_parameter('save_on_shutdown', True)
+
+        self.index_name = self.get_parameter('index_name').get_parameter_value().string_value
+        self.output_dir = self.get_parameter('output_dir').get_parameter_value().string_value
+        self.verbose = self.get_parameter('verbose').get_parameter_value().bool_value
+        self.save_on_shutdown = self.get_parameter('save_on_shutdown').get_parameter_value().bool_value
+
+        self._lock = threading.Lock()
+        self._records = []
+        self._seq = 0
+
+        self._latest_pose = None
+        self._latest_action = None
+        self._latest_gripper = None
+
+        # Topics: index_name 为空时订阅无后缀话题（单臂），非空时订阅带后缀话题（双臂）
+        pose_topic = f'/nero_FK{self.index_name}/urdf_end_pose_orient'
+        action_topic = f'/nero_inference{self.index_name}/action'
+        gripper_topic = f'/nero_inference{self.index_name}/action_gripper'
+
+        self.pose_sub = self.create_subscription(
+            PoseStamped, pose_topic, self._pose_cb, 10)
+        self.action_sub = self.create_subscription(
+            Float64MultiArray, action_topic, self._action_cb, 10)
+        self.gripper_sub = self.create_subscription(
+            Float32, gripper_topic, self._gripper_cb, 10)
+
+        os.makedirs(self.output_dir, exist_ok=True)
+        self._session_dir = os.path.join(
+            self.output_dir,
+            time.strftime('%Y%m%d_%H%M%S'))
+        os.makedirs(self._session_dir, exist_ok=True)
+
+        if self.verbose:
+            self.get_logger().info(f'=== Inference Action Capture ===')
+            self.get_logger().info(f'  index_name:       {self.index_name}')
+            self.get_logger().info(f'  output_dir:       {self._session_dir}')
+            self.get_logger().info(f'  pose topic:      {pose_topic}')
+            self.get_logger().info(f'  action topic:    {action_topic}')
+            self.get_logger().info(f'  gripper topic:   {gripper_topic}')
+            self.get_logger().info('=' * 50)
+
+        self._display_timer = self.create_timer(1.0, self._display_stats)
+
+    def _pose_cb(self, msg: PoseStamped):
+        with self._lock:
+            self._latest_pose = {
+                'position': {
+                    'x': msg.pose.position.x,
+                    'y': msg.pose.position.y,
+                    'z': msg.pose.position.z,
+                },
+                'orientation': {
+                    'x': msg.pose.orientation.x,
+                    'y': msg.pose.orientation.y,
+                    'z': msg.pose.orientation.z,
+                    'w': msg.pose.orientation.w,
+                },
+                'frame_id': msg.header.frame_id,
+                'stamp_sec': msg.header.stamp.sec,
+                'stamp_nanosec': msg.header.stamp.nanosec,
+            }
+
+    def _action_cb(self, msg: Float64MultiArray):
+        with self._lock:
+            self._latest_action = list(msg.data)
+            self._seq += 1
+            seq = self._seq
+            pose = self._latest_pose
+            gripper = self._latest_gripper
+
+        record = {
+            'seq': seq,
+            'timestamp': time.time(),
+            'topic': f'/nero_inference{self.index_name}/action',
+            'type': 'action',
+            'data': list(msg.data),
+        }
+        if pose is not None:
+            record['arm_current_pose'] = pose
+        if gripper is not None:
+            record['inference_gripper'] = gripper
+
+        with self._lock:
+            self._records.append(record)
+
+        self._log_action(seq, msg.data, pose, gripper)
+
+    def _gripper_cb(self, msg: Float32):
+        with self._lock:
+            self._latest_gripper = float(msg.data)
+
+    def _log_action(self, seq, data, pose, gripper):
+        if not self.verbose:
+            return
+        if len(data) >= 8:
+            dx, dy, dz = data[0], data[1], data[2]
+            dqx, dqy, dqz, dqw = data[3], data[4], data[5], data[6]
+            g = data[7]
+        elif len(data) >= 7:
+            dx, dy, dz = data[0], data[1], data[2]
+            dqx, dqy, dqz, dqw = data[3], data[4], data[5], data[6]
+            g = gripper if gripper is not None else 'N/A'
+        else:
+            dx, dy, dz = data[0], data[1] if len(data) > 1 else 0, data[2] if len(data) > 2 else 0
+            dqx = dqy = dqz = 0
+            dqw = 1
+            g = gripper if gripper is not None else 'N/A'
+
+        pos_str = ''
+        if pose:
+            pos_str = f'  arm=[{pose["position"]["x"]:.4f}, {pose["position"]["y"]:.4f}, {pose["position"]["z"]:.4f}]'
+
+        self.get_logger().info(
+            f'[#{seq:05d}] action delta: pos=[{dx:+.4f}, {dy:+.4f}, {dz:+.4f}]  '
+            f'quat=[{dqx:.4f}, {dqy:.4f}, {dqz:.4f}, {dqw:.4f}]  '
+            f'gripper={g}{pos_str}'
+        )
+
+    def _display_stats(self):
+        with self._lock:
+            count = len(self._records)
+        if self.verbose and count > 0:
+            self.get_logger().info(f'[Stats] Total records captured: {count}')
+
+    def save(self):
+        if not self._records:
+            self.get_logger().warn('No records to save')
+            return
+
+        records_file = os.path.join(self._session_dir, 'inference_actions.json')
+        with open(records_file, 'w') as f:
+            json.dump(self._records, f, indent=2)
+
+        meta = {
+            'index_name': self.index_name,
+            'total_records': len(self._records),
+            'start_time': self._records[0]['timestamp'] if self._records else None,
+            'end_time': self._records[-1]['timestamp'] if self._records else None,
+            'output_dir': self._session_dir,
+        }
+        meta_file = os.path.join(self._session_dir, 'metadata.json')
+        with open(meta_file, 'w') as f:
+            json.dump(meta, f, indent=2)
+
+        self.get_logger().info(
+            f'[Capture] Saved {len(self._records)} records to {records_file}')
+
+    def shutdown(self):
+        self.get_logger().info('[Capture] Shutting down...')
+        if self.save_on_shutdown:
+            self.save()
+        else:
+            self.get_logger().info(
+                f'[Capture] Skipped save (save_on_shutdown=false). '
+                f'Records in memory: {len(self._records)}')
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Inference Action Capture')
+    parser.add_argument('--index_name', type=str, default='')
+    parser.add_argument('--output_dir', type=str,
+                        default='/home/yxgn/inference_capture')
+    parser.add_argument('--verbose', type=str, default='true')
+    args, unknown = parser.parse_known_args()
+
+    rclpy.init()
+    node = InferenceActionCapture(args)
+
+    def cleanup(signum=None, frame=None):
+        node.shutdown()
+
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        signal.signal(sig, cleanup)
+
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        cleanup()
+
+
+if __name__ == '__main__':
+    main()

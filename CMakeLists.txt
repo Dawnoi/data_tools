@@ -67,7 +67,7 @@ target_link_libraries(${PROJECT_NAME}_dataSync ${catkin_LIBRARIES} ${PCL_LIBRARI
 add_executable(${PROJECT_NAME}_dataPublish src/dataPublish.cpp)
 ament_target_dependencies(${PROJECT_NAME}_dataPublish rclpy std_msgs sensor_msgs geometry_msgs nav_msgs pcl_conversions pcl_msgs visualization_msgs tf2 tf2_ros tf2_eigen tf2_sensor_msgs tf2_geometry_msgs OpenCV PCL data_msgs cv_bridge)
 target_link_libraries(${PROJECT_NAME}_dataPublish ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} ${CURL_LIBRARIES} libjsoncpp.so)
-
+# 数据推流
 add_executable(${PROJECT_NAME}_dataStreamer src/dataStreamer.cpp)
 ament_target_dependencies(${PROJECT_NAME}_dataStreamer rclpy std_msgs sensor_msgs geometry_msgs nav_msgs pcl_conversions pcl_msgs visualization_msgs tf2 tf2_ros tf2_eigen tf2_sensor_msgs tf2_geometry_msgs OpenCV PCL data_msgs cv_bridge)
 target_link_libraries(${PROJECT_NAME}_dataStreamer ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} ${CURL_LIBRARIES} libjsoncpp.so)
@@ -89,7 +89,7 @@ install(
 )
 
 install(
-  TARGETS ${PROJECT_NAME}_dataCapture ${PROJECT_NAME}_dataSync ${PROJECT_NAME}_dataPublish ${PROJECT_NAME}_dataStreamer
+  TARGETS ${PROJECT_NAME}_dataCapture ${PROJECT_NAME}_dataSync ${PROJECT_NAME}_dataPublish ${PROJECT_NAME}_dataStreamer #${PROJECT_NAME}_readMcap
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -98,11 +98,16 @@ install(
   DESTINATION include
 )
 
-file(GLOB python_scripts "scripts/*.py")
-install(PROGRAMS
-  ${python_scripts}
-  
+install(
+  PROGRAMS
+  scripts/inference_action_capture
   DESTINATION lib/${PROJECT_NAME}
+)
+
+install(
+  PROGRAMS
+  scripts/inference_action_capture
+  DESTINATION libexec/${PROJECT_NAME}
 )
 
 ament_export_include_directories(include)

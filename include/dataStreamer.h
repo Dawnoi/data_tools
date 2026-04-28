@@ -28,6 +28,11 @@
 #include <fcntl.h>
 #include <errno.h>
 
+// =====================================================================
+// ObservationBuffer — Ring buffer for aligned camera + arm state
+// =====================================================================
+// Stores the most recent N camera frames and arm poses, aligned by
+// timestamp so that each observation step has synchronized data.
 class ObservationBuffer {
 public:
     ObservationBuffer(int n_cameras, int n_arms, int n_obs_steps, double control_freq, double camera_freq)
@@ -55,34 +60,8 @@ public:
         }
     }
 
-    void addImage(int cam_idx, const cv::Mat& img, double ts) {
-        if (cam_idx < 0 || cam_idx >= n_cameras_) return;
-        std::lock_guard<std::mutex> lk(mutex_);
-        int k = static_cast<int>(image_buffers_[cam_idx].size());
-        int idx = (image_heads_[cam_idx] + image_counts_[cam_idx]) % k;
-        image_buffers_[cam_idx][idx] = img;
-        image_ts_buffers_[cam_idx][idx] = ts;
-        if (image_counts_[cam_idx] < k) {
-            image_counts_[cam_idx]++;
-        } else {
-            image_heads_[cam_idx] = (image_heads_[cam_idx] + 1) % k;
-        }
-    }
-
-    void addArmState(int arm_idx, const std::vector<double>& pose, double gripper, double ts) {
-        if (arm_idx < 0 || arm_idx >= n_arms_) return;
-        std::lock_guard<std::mutex> lk(mutex_);
-        int k = static_cast<int>(pose_buffers_[arm_idx].size());
-        int idx = (state_heads_[arm_idx] + state_counts_[arm_idx]) % k;
-        pose_buffers_[arm_idx][idx] = pose;
-        gripper_buffers_[arm_idx][idx] = gripper;
-        state_ts_buffers_[arm_idx][idx] = ts;
-        if (state_counts_[arm_idx] < k) {
-            state_counts_[arm_idx]++;
-        } else {
-            state_heads_[arm_idx] = (state_heads_[arm_idx] + 1) % k;
-        }
-    }
+    void addImage(int cam_idx, const cv::Mat& img, double ts);
+    void addArmState(int arm_idx, const std::vector<double>& pose, double gripper, double ts);
 
     struct AlignedObs {
         std::vector<cv::Mat> images;
@@ -90,93 +69,7 @@ public:
         std::vector<double> grippers;
         std::vector<double> timestamps;
     };
-
-    bool getAlignedObs(AlignedObs& out) {
-        std::lock_guard<std::mutex> lk(mutex_);
-        int k = 0;
-        if (!pose_buffers_.empty()) k = static_cast<int>(pose_buffers_[0].size());
-
-        for (int c = 0; c < n_cameras_; ++c) {
-            if (image_counts_[c] < k) return false;
-        }
-        for (int a = 0; a < n_arms_; ++a) {
-            if (state_counts_[a] < k) return false;
-        }
-
-        double last_ts = 0.0;
-        for (int a = 0; a < n_arms_; ++a) {
-            double t = state_ts_buffers_[a][(state_heads_[a] + state_counts_[a] - 1) % k];
-            if (a == 0 || t > last_ts) last_ts = t;
-        }
-
-        out.timestamps.resize(n_obs_steps_);
-        for (int i = 0; i < n_obs_steps_; ++i) {
-            out.timestamps[i] = last_ts - (n_obs_steps_ - 1 - i) * dt_;
-        }
-
-        out.images.resize(n_cameras_ * n_obs_steps_);
-        for (int c = 0; c < n_cameras_; ++c) {
-            int k_cam = static_cast<int>(image_buffers_[c].size());
-            std::vector<double> cam_ts(image_counts_[c]);
-            for (int i = 0; i < image_counts_[c]; ++i) {
-                int buf_idx = (image_heads_[c] + i) % k_cam;
-                cam_ts[i] = image_ts_buffers_[c][buf_idx];
-            }
-            double cam_oldest = image_counts_[c] > 0 ? cam_ts[0] : 0.0;
-            double cam_newest = image_counts_[c] > 0 ? cam_ts[image_counts_[c] - 1] : 0.0;
-            for (int i = 0; i < n_obs_steps_; ++i) {
-                double t = out.timestamps[i];
-                int best_idx = 0;
-                if (image_counts_[c] <= 1) {
-                    best_idx = 0;
-                } else if (t <= cam_oldest) {
-                    best_idx = 0;
-                } else if (t >= cam_newest) {
-                    best_idx = image_counts_[c] - 1;
-                } else {
-                    for (int j = 0; j < image_counts_[c] - 1; ++j) {
-                        if (cam_ts[j] <= t && cam_ts[j + 1] > t) { best_idx = j; break; }
-                    }
-                }
-                int buf_idx = (image_heads_[c] + best_idx) % k_cam;
-                out.images[c * n_obs_steps_ + i] = image_buffers_[c][buf_idx];
-            }
-        }
-
-        out.poses.resize(n_arms_ * n_obs_steps_);
-        out.grippers.resize(n_arms_ * n_obs_steps_);
-        for (int a = 0; a < n_arms_; ++a) {
-            int k_s = static_cast<int>(pose_buffers_[a].size());
-            std::vector<double> arm_ts(state_counts_[a]);
-            for (int i = 0; i < state_counts_[a]; ++i) {
-                int buf_idx = (state_heads_[a] + i) % k_s;
-                arm_ts[i] = state_ts_buffers_[a][buf_idx];
-            }
-            double arm_oldest = state_counts_[a] > 0 ? arm_ts[0] : 0.0;
-            double arm_newest = state_counts_[a] > 0 ? arm_ts[state_counts_[a] - 1] : 0.0;
-            for (int i = 0; i < n_obs_steps_; ++i) {
-                double t = out.timestamps[i];
-                int best_idx = 0;
-                // Clamp t to valid range to avoid stale/wrong data when arm is lagging.
-                if (state_counts_[a] <= 1) {
-                    best_idx = 0;
-                } else if (t <= arm_oldest) {
-                    best_idx = 0;
-                } else if (t >= arm_newest) {
-                    best_idx = state_counts_[a] - 1;
-                } else {
-                    for (int j = 0; j < state_counts_[a] - 1; ++j) {
-                        if (arm_ts[j] <= t && arm_ts[j + 1] > t) { best_idx = j; break; }
-                    }
-                }
-                int buf_idx = (state_heads_[a] + best_idx) % k_s;
-                out.poses[a * n_obs_steps_ + i] = pose_buffers_[a][buf_idx];
-                out.grippers[a * n_obs_steps_ + i] = gripper_buffers_[a][buf_idx];
-            }
-        }
-
-        return true;
-    }
+    bool getAlignedObs(AlignedObs& out);
 
     int n_obs_steps() const { return n_obs_steps_; }
     int n_cameras() const { return n_cameras_; }
@@ -204,6 +97,11 @@ private:
 };
 
 
+// =====================================================================
+// SocketClient — TCP client for JSON request/response with inference server
+// =====================================================================
+// Uses newline-delimited JSON over a persistent TCP connection.
+// Supports automatic reconnection with bounded retry attempts.
 class SocketClient {
 public:
     SocketClient(const std::string& host, int port)
@@ -211,127 +109,13 @@ public:
 
     ~SocketClient() { disconnect(); }
 
-    bool connect(double timeout_sec = 5.0) {
-        disconnect();
-
-        struct addrinfo hints{}, *res;
-        memset(&hints, 0, sizeof(hints));
-        hints.ai_family = AF_INET;
-        hints.ai_socktype = SOCK_STREAM;
-
-        int ret = getaddrinfo(host_.c_str(), std::to_string(port_).c_str(), &hints, &res);
-        if (ret != 0) {
-            RCLCPP_ERROR(rclcpp::get_logger("SocketClient"), "DNS lookup failed: %s", gai_strerror(ret));
-            return false;
-        }
-
-        sock_fd_ = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-        if (sock_fd_ < 0) {
-            RCLCPP_ERROR(rclcpp::get_logger("SocketClient"), "socket() failed: %s", strerror(errno));
-            freeaddrinfo(res);
-            return false;
-        }
-
-        struct timeval tv;
-        tv.tv_sec = static_cast<long>(timeout_sec);
-        tv.tv_usec = static_cast<long>((timeout_sec - (long)timeout_sec) * 1e6);
-        setsockopt(sock_fd_, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
-        setsockopt(sock_fd_, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-
-        if (::connect(sock_fd_, res->ai_addr, res->ai_addrlen) < 0) {
-            RCLCPP_ERROR(rclcpp::get_logger("SocketClient"), "connect() to %s:%d failed: %s",
-                         host_.c_str(), port_, strerror(errno));
-            freeaddrinfo(res);
-            close(sock_fd_);
-            sock_fd_ = -1;
-            connected_ = false;
-            return false;
-        }
-        freeaddrinfo(res);
-        connected_ = true;
-        reconnect_attempts_ = 0;
-        return true;
-    }
-
-    bool reconnect(double timeout_sec = 5.0) {
-        reconnect_attempts_++;
-        RCLCPP_INFO(rclcpp::get_logger("SocketClient"),
-                    "[SocketClient] Attempting reconnect #%d to %s:%d (attempt %d of %d)",
-                    reconnect_attempts_, host_.c_str(), port_, reconnect_attempts_, max_reconnect_attempts_);
-        return connect(timeout_sec);
-    }
-
+    bool connect(double timeout_sec = 5.0);
+    bool reconnect(double timeout_sec = 5.0);
     int reconnectAttempts() const { return reconnect_attempts_; }
     static constexpr int maxReconnectAttempts() { return max_reconnect_attempts_; }
-
-    void disconnect() {
-        if (sock_fd_ >= 0) {
-            ::close(sock_fd_);
-            sock_fd_ = -1;
-        }
-        connected_ = false;
-    }
-
-    bool sendJson(const Json::Value& obj) {
-        if (!connected_ || sock_fd_ < 0) return false;
-        std::string msg = Json::FastWriter().write(obj) + "\n";
-        ssize_t sent = ::send(sock_fd_, msg.c_str(), msg.size(), MSG_NOSIGNAL);
-        return sent == static_cast<ssize_t>(msg.size());
-    }
-
-    Json::Value recvJson(double timeout_sec = 5.0) {
-        Json::Value result;  // default-constructed = nullValue
-        if (!connected_ || sock_fd_ < 0) return result;
-
-        std::string line;
-        line.reserve(4096);
-        auto deadline = std::chrono::steady_clock::now() + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-            std::chrono::duration<double>(timeout_sec));
-
-        while (true) {
-            char buf[4096];
-            ssize_t n = ::recv(sock_fd_, buf, sizeof(buf) - 1, 0);
-            if (n <= 0) {
-                if (n < 0) {
-                    RCLCPP_WARN(rclcpp::get_logger("SocketClient"),
-                        "recvJson: recv error errno=%d", errno);
-                }
-                break;
-            }
-            buf[n] = '\0';
-            line += buf;
-
-            size_t pos;
-            while ((pos = line.find('\n')) != std::string::npos) {
-                std::string msg = line.substr(0, pos);
-                line.erase(0, pos + 1);
-                if (!msg.empty()) {
-                    Json::Value parsed;
-                    Json::Reader reader;
-                    if (reader.parse(msg, parsed)) {
-                        // Only return object or null — reject arrays/strings/etc
-                        if (parsed.isObject()) {
-                            std::string type = parsed.get("type", "").asString();
-                            RCLCPP_INFO(rclcpp::get_logger("SocketClient"),
-                                "recvJson: returning type='%s', line_len=%zu", type.c_str(), msg.size());
-                            return parsed;
-                        }
-                        RCLCPP_WARN(rclcpp::get_logger("SocketClient"),
-                            "recvJson: discarding non-object JSON (type=%d)", parsed.type());
-                    } else {
-                        RCLCPP_WARN(rclcpp::get_logger("SocketClient"),
-                            "recvJson: JSON parse error, raw='%.100s'", msg.c_str());
-                    }
-                }
-            }
-
-            if (std::chrono::steady_clock::now() >= deadline) break;
-        }
-        RCLCPP_INFO(rclcpp::get_logger("SocketClient"),
-            "recvJson: returning null (line_buffer='%.100s')", line.c_str());
-        return result;  // nullValue
-    }
-
+    void disconnect();
+    bool sendJson(const Json::Value& obj);
+    Json::Value recvJson(double timeout_sec = 5.0);
     bool isConnected() const { return connected_; }
 
 private:
@@ -344,59 +128,78 @@ private:
 };
 
 
+// =====================================================================
+// DataStreamer — Observation streaming + inference action execution node
+// =====================================================================
+//
+// Architecture (3 producer threads, 1 consumer thread):
+//
+//   sendLoop       — Producer: grabs aligned obs from buffer, sends JSON over
+//                    TCP socket to inference server, then blocks waiting for
+//                    the action pipeline to finish before the next cycle.
+//   recvLoop       — Consumer: receives JSON responses (action/reset_ack) from
+//                    the server and populates pending_actions_.
+//   actionStepLoop — Executor: publishes individual action steps (at inference_freq)
+//                    from pending_actions_, one step per tick. Also waits for
+//                    FK pose convergence before notifying sendLoop to continue.
+//
+// Pipeline: sendLoop sends obs
+//              -> recvLoop receives action
+//              -> actionStepLoop publishes all steps
+//              -> waits for robot execution (FK convergence)
+//              -> sendLoop unblocks and sends next obs
+//
+// Key safety guard: checkActionSafety() clamps per-step delta (pos, angle)
+//                   and enforces publish_rate_hz. Steps that fail safety
+//                   are silently skipped; if all steps are rejected the
+//                   entire sequence is aborted and sendLoop reconnects.
 class DataStreamer : public rclcpp::Node {
 public:
     DataStreamer(const rclcpp::NodeOptions& options);
     ~DataStreamer();
 
 private:
-    // Camera callbacks
+    // ---- ROS2 callbacks ----
     void cameraColorCallback(const sensor_msgs::msg::Image::SharedPtr msg, int cam_buf_idx, const std::string& arm_name);
-    // Pose callbacks (arm end pose from FK/IK)
     void armEndPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg, int idx, const std::string& arm_name);
-    // Remote sensor pose callback (teleop master device)
     void pikaPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg, const std::string& arm_name);
     void teleopStatusCallback(const data_msgs::msg::TeleopStatus::SharedPtr msg);
-    // Gripper encoder callbacks
     void gripperEncoderCallback(const data_msgs::msg::Gripper::SharedPtr msg, int idx);
 
-    // Core loops
+    // ---- Core loops ----
     void sendLoop();
     void recvLoop();
     void actionStepLoop();
     void waitForExecutionComplete();
 
-    // Helpers
+    // ---- Helpers ----
     bool sendReset();
     std::string matToBase64Jpeg(const cv::Mat& img, int quality = 85);
     std::vector<double> poseStampedToVec7(const geometry_msgs::msg::PoseStamped& msg);
-    bool checkActionSafety(const std::vector<double>& action, int arm_idx);
+    bool checkActionSafety(const std::vector<double>& action, int arm_idx, const std::string& arm_name,
+                          const std::vector<double>& current_pose, double current_gripper);
     bool publishAction(const std::vector<std::vector<double>>& actions);
 
-    // ROS2 subscriptions
+    // ---- ROS2 subscriptions ----
     std::vector<rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr> subCameraColors_;
     std::vector<rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr> subArmEndPoses_;
     std::vector<rclcpp::Subscription<data_msgs::msg::Gripper>::SharedPtr> subGripperEncoders_;
     std::map<std::string, rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr> subPikaPoses_;
     rclcpp::Subscription<data_msgs::msg::TeleopStatus>::SharedPtr subTeleopStatus_;
 
-    // ROS2 publishers for inference action output
+    // ---- ROS2 publishers ----
     std::vector<rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr> action_pose_pubs_;
     std::vector<rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr> action_gripper_pubs_;
     int action_arm_index_ = 0;
 
-    // Config
+    // ---- Config (from YAML) ----
     std::vector<std::string> cameraColorTopics_;
     std::vector<std::string> cameraColorNames_;
     std::vector<std::string> armEndPoseTopics_;
     std::vector<std::string> armEndPoseNames_;
     std::vector<std::string> gripperEncoderTopics_;
     std::vector<std::string> gripperEncoderNames_;
-    std::vector<bool> armEndPoseOrients_;
-    std::vector<double> armEndPoseOffsets_;
-    std::map<std::string, std::string> arm_pika_pose_topic_;  // arm_name -> topic name (e.g. arm_r -> /pika_pose_r)
-
-    // Network config
+    std::map<std::string, std::string> arm_pika_pose_topic_;
     std::string server_host_;
     int server_port_;
     int n_arms_;
@@ -405,103 +208,66 @@ private:
     double camera_freq_;
     int jpeg_quality_;
     bool auto_reset_;
-    double action_wait_timeout_sec_;
 
-    // Observation buffer
+    // ---- State ----
     std::unique_ptr<ObservationBuffer> obs_buffer_;
-
-    // Socket
     std::unique_ptr<SocketClient> socket_client_;
 
-    // Threads
     std::thread send_thread_;
     std::thread recv_thread_;
     std::thread action_step_thread_;
     std::atomic<bool> running_{false};
 
-    // Mutex for gripper latest data
     std::mutex gripper_mutex_;
     std::map<std::string, double> gripper_latest_;
 
-    // Arm config
-    std::vector<std::string> arm_names_;  // active arm names from YAML, e.g. ['arm_l', 'arm_r'] or ['arm_l']
-    std::map<std::string, int> arm_name_to_buffer_idx_;  // arm_name -> ObservationBuffer arm_idx
-    std::map<std::string, std::string> arm_gripper_name_;  // arm_name -> gripper encoder name (e.g. arm_l -> gripper_l)
-
-    // Per-arm camera: arm_name -> [global_cam_idx, ...]
+    // arm_name -> ObservationBuffer arm_idx
+    std::vector<std::string> arm_names_;
+    std::map<std::string, int> arm_name_to_buffer_idx_;
+    std::map<std::string, std::string> arm_gripper_name_;
     std::map<std::string, std::vector<int>> arm_to_global_cam_idx_;
-
-    // Ordered per-arm camera names (positions match obs.images layout)
     std::vector<std::string> ordered_per_arm_cam_names_;
-
-    // Init pose: first recorded pose per arm, protected by init_pose_mutex_
-    std::mutex init_pose_mutex_;
-    std::map<std::string, std::vector<double>> arm_init_pose_;  // arm_name -> 7D pose (xyz + quaternion)
-    std::map<std::string, bool> arm_init_pose_recorded_;
 
     // Remote sensor (pika_pose) tracking for teleop-style offset mode
     std::mutex pika_pose_mutex_;
-    std::map<std::string, std::vector<double>> pika_pose_init_;      // arm_name -> first recorded sensor pose (calibration)
-    std::map<std::string, std::vector<double>> pika_pose_current_;   // arm_name -> latest sensor pose
+    std::map<std::string, std::vector<double>> pika_pose_init_;
+    std::map<std::string, std::vector<double>> pika_pose_current_;
     std::map<std::string, bool> pika_pose_init_recorded_;
-    std::map<std::string, bool> pika_pose_side_is_left_;            // arm_name -> true if left arm
 
-    // Debug
+    // ---- Debug ----
     std::atomic<bool> debug_enabled_{false};
     std::string debug_dir_;
     std::atomic<int> debug_frame_idx_{0};
 
-    // Counters
+    // ---- Counters ----
     std::atomic<int64_t> observations_sent_{0};
-    std::atomic<int64_t> actions_received_{0};
     std::mutex action_mutex_;
     std::mutex exec_target_mutex_;
     std::vector<std::vector<double>> exec_target_poses_;
 
-    // Condition variable for pipeline synchronization:
-    // sendLoop pauses observation sending while action_sequence_in_progress_ is true.
-    // This ensures each inference is based on the true arm state after the previous
-    // action sequence completes (Scheme A: observe -> execute -> observe).
+    // ---- Pipeline sync (observe -> action -> execute -> observe) ----
     std::mutex pipeline_mutex_;
     std::condition_variable pipeline_cv_;
-    bool waiting_for_action_ = false;  // true: obs sent, waiting for action response
-    double obs_sent_timestamp_ = 0.0;  // wall-clock time when obs was sent (for latency debug)
+    bool waiting_for_action_ = false;
 
-    // Handshake state for action flow synchronization
-    std::mutex handshake_mutex_;
-    std::condition_variable handshake_cv_;
-    bool handshake_received_ = false;
-    double handshake_sent_timestamp_ = 0.0;
-    double handshake_received_timestamp_ = 0.0;
-    std::string handshake_arm_;
+    std::vector<std::vector<std::vector<double>>> pending_actions_;
+    int action_sequence_index_ = 0;
+    int action_sequence_steps_total_ = 0;
+    bool action_sequence_in_progress_ = false;
+    bool action_sequence_any_published_ = false;
 
-    std::vector<std::vector<std::vector<double>>> pending_actions_;  // per-arm multi-step sequences, index matches arm_names_
-    int action_sequence_index_ = 0;  // current step index within the pending sequence
-    int action_sequence_steps_total_ = 0;  // total steps in current sequence
-    bool action_sequence_in_progress_ = false;  // guard: don't overwrite pending sequence with new action
-    bool action_sequence_any_published_ = false;  // tracks whether at least one step was published; if not, the sequence is considered failed
-
-    // Camera info
-
-    // Safety filter state
+    // ---- Safety filter ----
     bool safety_enabled_ = true;
     double safety_max_pos_delta_ = 0.05;
-    double safety_max_gripper_delta_ = 0.3;
     double safety_max_angle_delta_ = 0.5;
-    double safety_pos_x_min_ = 0.0, safety_pos_x_max_ = 0.8;
-    double safety_pos_y_min_ = -0.6, safety_pos_y_max_ = 0.6;
-    double safety_pos_z_min_ = -0.2, safety_pos_z_max_ = 0.7;
     double safety_publish_rate_hz_ = 20.0;
     bool safety_log_rejections_ = true;
-    bool safety_quat_multiply_body_frame_ = true;
-    std::vector<double> last_safe_action_;
-    std::mutex safety_mutex_;
     std::chrono::steady_clock::time_point last_safe_publish_time_;
 
-    // Cumulative absolute pose for delta-based safety (per arm)
+    // Cumulative absolute pose (per arm) — updated every callback, used for safety delta checks
     std::mutex cumulative_pose_mutex_;
-    std::map<std::string, std::vector<double>> arm_cumulative_pose_;  // arm_name -> 7D pose (xyz + quaternion)
-    std::map<std::string, double> arm_cumulative_gripper_;            // arm_name -> absolute gripper value [0,0.1]
+    std::map<std::string, std::vector<double>> arm_cumulative_pose_;
+    std::map<std::string, double> arm_cumulative_gripper_;
 };
 
 #endif
